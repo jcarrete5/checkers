@@ -1,0 +1,8 @@
+#!/bin/bash
+# Deploy lambdas to AWS
+set -e
+mkdir -p build/
+zip build/lambda_create_game.zip lambda_create_game.py
+zip build/lambda_join_game.zip lambda_join_game.py
+aws lambda update-function-code --function-name checkersCreateGame --zip-file fileb://build/lambda_create_game.zip
+aws lambda update-function-code --function-name checkersJoinGame --zip-file fileb://build/lambda_join_game.zip
