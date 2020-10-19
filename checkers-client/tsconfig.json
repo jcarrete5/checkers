@@ -6,7 +6,8 @@
     "outDir": "public",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true
   },
   "exclude": ["node_modules"]
 }

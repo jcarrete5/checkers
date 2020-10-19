@@ -8,13 +8,18 @@
   "private": true,
   "scripts": {
     "start": "http-server",
-    "build": "tsc --watch",
-    "deploy": "gh-pages -d public"
+    "build": "webpack",
+    "deploy": "gh-pages -d dist"
   },
-  "dependencies": {},
+  "dependencies": {
+    "aws-sdk": "^2.774.0"
+  },
   "devDependencies": {
     "gh-pages": "^3.1.0",
     "http-server": "^0.12.3",
-    "typescript": "^4.0.3"
+    "ts-loader": "^8.0.5",
+    "typescript": "^4.0.3",
+    "webpack": "^5.1.3",
+    "webpack-cli": "^4.1.0"
   }
 }
