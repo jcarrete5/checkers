@@ -4,17 +4,16 @@ module.exports = {
   entry: './src/index.ts',
   output: {
     path: path.resolve(__dirname, 'public'),
-    filename: 'bundle.js'
+    filename: 'bundle.js',
   },
   resolve: {
-    fallback: { 'util': false }
+    fallback: { util: false },
   },
   module: {
-      rules: [
-          { test: /\.ts$/, use: 'ts-loader', exclude: '/node_modules/' },
-      ]
+    rules: [{ test: /\.ts$/, use: 'ts-loader', exclude: '/node_modules/' }],
   },
+  devtool: 'eval-source-map',
   devServer: {
-    contentBase: path.join(__dirname, 'public')
-  }
+    contentBase: path.join(__dirname, 'public'),
+  },
 }
