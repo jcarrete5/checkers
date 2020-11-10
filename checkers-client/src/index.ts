@@ -1,5 +1,6 @@
 import { CognitoIdentityCredentials } from 'aws-sdk'
 import DynamoDB from 'aws-sdk/clients/dynamodb'
+import { drawBoard } from "./gameboard.ts";
 
 // Initialize AWS credentials for DynamoDB access
 const creds = new CognitoIdentityCredentials({
@@ -75,3 +76,4 @@ joinGame.addEventListener('click', async ev => {
     }
 })
 
+drawBoard()
