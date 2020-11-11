@@ -8,12 +8,20 @@ module.exports = {
   },
   resolve: {
     fallback: { util: false },
+    extensions: ['.ts', '.js']
   },
   module: {
-    rules: [{ test: /\.ts$/, use: 'ts-loader', exclude: '/node_modules/' }],
+    rules: [
+      {
+        test: /\.ts$/,
+        use: 'ts-loader',
+        include: path.resolve(__dirname, 'src')
+      }
+    ],
   },
   devtool: 'eval-source-map',
   devServer: {
+    publicPath: path.join(__dirname, 'public'),
     contentBase: path.join(__dirname, 'public'),
   },
 }
