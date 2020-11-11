@@ -11,7 +11,6 @@ jobs:
       # TODO add dependency caching
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2.1.2
-      - run: npm i -g yarn
       - name: Install and deploy
         working-directory: $${{env.working-directory}}
         run: |
