@@ -8,7 +8,7 @@
   "private": true,
   "scripts": {
     "start": "webpack --mode=development serve",
-    "deploy": "gh-pages -d public -u 'Jason <jasoncarrete5@gmail.com>",
+    "deploy": "gh-pages -d public -u 'Jason <jasoncarrete5@gmail.com>'",
     "precommit": "lint-staged",
     "fmt": "prettier --write './**/*.js'"
   },
