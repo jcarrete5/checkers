@@ -11,5 +11,8 @@ jobs:
       - uses: actions/setup-node@v2.1.2
       - run: yarn --frozen-lockfile
         working-directory: checkers-client
-      - run: yarn deploy
-        working-directory: checkers-client
+      - uses: JamesIves/github-pages-deploy-action@3.7.1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: gh-pages
+          FOLDER: checkers-client/public
