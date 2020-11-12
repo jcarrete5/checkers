@@ -9,7 +9,7 @@ jobs:
       # TODO add dependency caching
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2.1.2
-      - run: yarn install --frozen-lockfile --prod
+      - run: yarn --frozen-lockfile
         working-directory: checkers-client
       - run: yarn deploy
         working-directory: checkers-client
