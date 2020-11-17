@@ -21,7 +21,6 @@ module.exports = {
   },
   devtool: 'eval-source-map',
   devServer: {
-    publicPath: path.join(__dirname, 'public'),
     contentBase: path.join(__dirname, 'public'),
   },
 }
