@@ -12,11 +12,16 @@ const g = _g
 
 /** Enumeration of values that can occupy a space on the board. */
 enum Space {
-    FREE /** A free space */,
-    LOCAL /** Local player's man */,
-    REMOTE /** Remote player's man */,
-    LOCAL_KING /** Local player's king */,
-    REMOTE_KING /** Remote player's king */,
+    /** A free space */
+    FREE,
+    /** Local player's man */
+    LOCAL,
+    /** Remote player's man */
+    REMOTE,
+    /** Local player's king */
+    LOCAL_KING,
+    /** Remote player's king */
+    REMOTE_KING,
 }
 
 /** Initialize board state */
