@@ -115,10 +115,5 @@ boardCanvas.addEventListener('click', (e) => {
     if (board[row][col] === Space.LOCAL) {
         selectedSquare = { row, col }
     }
-    /* TODO this needs to update the state. Drawing should only be done in drawBoard
-     * RATIONALE: The board will need to be redrawn everytime something on the
-     * board changes (i.e. the board state) to avoid leaving previously drawn
-     * artifacts behind. Therefore all of the drawing code should happen in one
-     * place so everything can be redrawn at once. */
     drawBoard()
 })
