@@ -12,17 +12,21 @@ const g = _g
 
 /** Enumeration of values that can occupy a space on the board. */
 enum Space {
-    FREE,           /** A free space */
-    LOCAL,          /** Local player's man */
-    REMOTE,         /** Remote player's man */
-    LOCAL_KING,     /** Local player's king */
-    REMOTE_KING,    /** Remote player's king */
+    FREE /** A free space */,
+    LOCAL /** Local player's man */,
+    REMOTE /** Remote player's man */,
+    LOCAL_KING /** Local player's king */,
+    REMOTE_KING /** Remote player's king */,
 }
 
 /** Initialize board state */
 const O = Space.LOCAL
 const X = Space.REMOTE
 const _ = Space.FREE
+
+const NO_SELECTION = -1
+const SELECTION_WIDTH = 2
+const SELECTION_BORDER_COLOR = 'red'
 const board = [
     [_, X, _, X, _, X, _, X],
     [X, _, X, _, X, _, X, _],
@@ -33,6 +37,8 @@ const board = [
     [_, O, _, O, _, O, _, O],
     [O, _, O, _, O, _, O, _],
 ]
+
+var selectedSquare: { row: number; col: number } = { row: NO_SELECTION, col: NO_SELECTION }
 
 const LOCAL_PIECE_COLOR = '#edf285'
 const REMOTE_PIECE_COLOR = '#fd8c04'
@@ -71,6 +77,19 @@ export function drawBoard() {
             }
         }
     }
+
+    // highlight selected piece (if any)
+    if (
+        selectedSquare.row !== NO_SELECTION &&
+        selectedSquare.col !== NO_SELECTION &&
+        board[selectedSquare.row][selectedSquare.col] === Space.LOCAL
+    ) {
+        g.strokeStyle = SELECTION_BORDER_COLOR
+        g.beginPath()
+        g.rect(selectedSquare.col * SIDE_LEN, selectedSquare.row * SIDE_LEN, SIDE_LEN, SIDE_LEN)
+        g.lineWidth = SELECTION_WIDTH
+        g.stroke()
+    }
 }
 
 function getMousePosition(canvas: HTMLCanvasElement, event: MouseEvent) {
@@ -81,30 +100,25 @@ function getMousePosition(canvas: HTMLCanvasElement, event: MouseEvent) {
 }
 
 function getClickedSquare(x: number, y: number) {
-    var i: number = 0
-    var j: number = 0
-    i = Math.floor(y / SIDE_LEN)
-    j = Math.floor(x / SIDE_LEN)
-    console.log(`i: ${i}, j: ${j}`)
-    return { i, j }
+    var row: number = 0
+    var col: number = 0
+    row = Math.floor(y / SIDE_LEN)
+    col = Math.floor(x / SIDE_LEN)
+    console.log(`row: ${row}, col: ${col}`)
+    return { row, col }
 }
 
 boardCanvas.addEventListener('click', (e) => {
     var { x, y } = getMousePosition(boardCanvas, e)
-    var { i, j } = getClickedSquare(x, y)
 
+    var { row, col } = getClickedSquare(x, y)
+    if (board[row][col] === Space.LOCAL) {
+        selectedSquare = { row, col }
+    }
     /* TODO this needs to update the state. Drawing should only be done in drawBoard
      * RATIONALE: The board will need to be redrawn everytime something on the
      * board changes (i.e. the board state) to avoid leaving previously drawn
      * artifacts behind. Therefore all of the drawing code should happen in one
      * place so everything can be redrawn at once. */
-
-    // highlight selected piece (if any)
-    if (board[i][j] === Space.LOCAL) {
-        g.beginPath()
-        g.rect(j * SIDE_LEN, i * SIDE_LEN, SIDE_LEN, SIDE_LEN)
-        g.lineWidth = 3
-        g.strokeStyle = 'red'
-        g.stroke()
-    }
+    drawBoard()
 })
