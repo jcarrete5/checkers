@@ -4,11 +4,19 @@
  * Module for implementing rendering and maintaining state of the gameboard.
  */
 
-/** Initialize graphics context */
 const boardCanvas = document.getElementById('board-canvas') as HTMLCanvasElement
-const _g = boardCanvas.getContext('2d')
-if (!_g) throw 'Failed to load graphics 2D context for board canvas'
-const g = _g
+
+/*************
+ * CONSTANTS
+ *************/
+
+const LOCAL_PIECE_COLOR = '#edf285'
+const REMOTE_PIECE_COLOR = '#fd8c04'
+const DARK_SPACE_COLOR = '#8db596'
+const LIGHT_SPACE_COLOR = '#bedbbb'
+const SELECTION_BORDER_COLOR = 'red'
+const SELECTION_WIDTH = 2
+const SIDE_LEN = boardCanvas.width / 8
 
 /** Enumeration of values that can occupy a space on the board. */
 enum Space {
@@ -24,14 +32,15 @@ enum Space {
     REMOTE_KING,
 }
 
-/** Initialize board state */
+/************************
+ * STATE INITIALIZATION
+ ************************/
+
 const O = Space.LOCAL
 const X = Space.REMOTE
 const _ = Space.FREE
 
-const NO_SELECTION = -1
-const SELECTION_WIDTH = 2
-const SELECTION_BORDER_COLOR = 'red'
+/** Board state */
 const board = [
     [_, X, _, X, _, X, _, X],
     [X, _, X, _, X, _, X, _],
@@ -43,20 +52,28 @@ const board = [
     [O, _, O, _, O, _, O, _],
 ]
 
-var selectedSquare: { row: number; col: number } = { row: NO_SELECTION, col: NO_SELECTION }
+/** Graphics context */
+const _g = boardCanvas.getContext('2d')
+if (!_g) throw 'Failed to load graphics 2D context for board canvas'
+const g = _g
 
-const LOCAL_PIECE_COLOR = '#edf285'
-const REMOTE_PIECE_COLOR = '#fd8c04'
-const DARK_SPACE_COLOR = '#8db596'
-const LIGHT_SPACE_COLOR = '#bedbbb'
-const SIDE_LEN = boardCanvas.width / 8
+interface BoardIndex {
+    row: number,
+    col: number
+}
+/** Current selected space on the board */
+let selectedSpace: BoardIndex | null = null
 
-function isLocalPiece(i: number, j: number) {
-    return board[i][j] === Space.LOCAL || board[i][j] === Space.LOCAL_KING
+/***************
+ * FUNCTIONS
+ ***************/
+
+function isLocalPiece(i: BoardIndex) {
+    return board[i.row][i.col] === Space.LOCAL || board[i.row][i.col] === Space.LOCAL_KING
 }
 
-function isRemotePiece(i: number, j: number) {
-    return board[i][j] === Space.REMOTE || board[i][j] === Space.REMOTE_KING
+function isRemotePiece(i: BoardIndex) {
+    return board[i.row][i.col] === Space.REMOTE || board[i.row][i.col] === Space.REMOTE_KING
 }
 
 function drawCircle(x: number, y: number, color: string) {
@@ -75,23 +92,19 @@ export function drawBoard() {
             const y = i * SIDE_LEN
 
             g.fillRect(x, y, SIDE_LEN, SIDE_LEN)
-            if (isRemotePiece(i, j)) {
+            if (isRemotePiece({row: i, col: j})) {
                 drawCircle(x, y, REMOTE_PIECE_COLOR)
-            } else if (isLocalPiece(i, j)) {
+            } else if (isLocalPiece({row: i, col: j})) {
                 drawCircle(x, y, LOCAL_PIECE_COLOR)
             }
         }
     }
 
     // highlight selected piece (if any)
-    if (
-        selectedSquare.row !== NO_SELECTION &&
-        selectedSquare.col !== NO_SELECTION &&
-        board[selectedSquare.row][selectedSquare.col] === Space.LOCAL
-    ) {
+    if (selectedSpace && isLocalPiece(selectedSpace)) {
         g.strokeStyle = SELECTION_BORDER_COLOR
         g.beginPath()
-        g.rect(selectedSquare.col * SIDE_LEN, selectedSquare.row * SIDE_LEN, SIDE_LEN, SIDE_LEN)
+        g.rect(selectedSpace.col * SIDE_LEN, selectedSpace.row * SIDE_LEN, SIDE_LEN, SIDE_LEN)
         g.lineWidth = SELECTION_WIDTH
         g.stroke()
     }
@@ -118,7 +131,7 @@ boardCanvas.addEventListener('click', (e) => {
 
     var { row, col } = getClickedSquare(x, y)
     if (board[row][col] === Space.LOCAL) {
-        selectedSquare = { row, col }
+        selectedSpace = { row, col }
     }
     drawBoard()
 })
