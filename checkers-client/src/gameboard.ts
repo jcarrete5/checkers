@@ -1,4 +1,14 @@
+/**
+ * gameboard.ts
+ *
+ * Module for implementing rendering and maintaining state of the gameboard.
+ */
+
+/** Init graphics context */
 const boardCanvas = document.getElementById('board-canvas') as HTMLCanvasElement
+const _g = boardCanvas.getContext('2d')
+if (!_g) throw 'Failed to load graphics 2D context for board canvas'
+const g = _g
 
 const NUM_ROWS = 8
 const NUM_COLS = 8
@@ -16,10 +26,6 @@ const board = [
 ]
 
 function drawCircle(x: number, y: number, color: string) {
-    if (!g) {
-        console.error('Failed to get graphics context for canvas')
-        return
-    }
     g.fillStyle = color
     g.beginPath()
     g.arc(x + SIDE_LEN / 2, y + SIDE_LEN / 2, SIDE_LEN / 2, 0, Math.PI * 2, false)
@@ -27,10 +33,6 @@ function drawCircle(x: number, y: number, color: string) {
     g.fill()
 }
 export function drawBoard() {
-    if (!g) {
-        console.error('Failed to get graphics context for canvas')
-        return
-    }
     for (var i = 0; i < board.length; i++) {
         for (var j = 0; j < board[i].length; j++) {
             g.fillStyle = (i + j) % 2 ? '#8db596' : '#bedbbb'
@@ -69,10 +71,6 @@ boardCanvas.addEventListener('click', (e) => {
 
     // highlight selected piece (if any)
     if (board[i][j] === 1) {
-        if (!g) {
-            console.error('Failed to get graphics context for canvas')
-            return
-        }
         g.beginPath()
         g.rect(j * SIDE_LEN, i * SIDE_LEN, SIDE_LEN, SIDE_LEN)
         g.lineWidth = 3
