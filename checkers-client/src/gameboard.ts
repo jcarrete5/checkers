@@ -51,10 +51,10 @@ var gameTurn = Space.LOCAL
 const board = [
     [_, X, _, X, _, _, _, X],
     [X, _, X, _, X, _, _, _],
-    [_, X, _, O, _, X, _, X],
+    [_, X, _, O, _, _, _, X],
+    [_, _, _, _, X, _, _, _],
     [_, _, _, _, _, _, _, _],
-    [_, _, _, X, _, _, _, _],
-    [O, _, O, _, O, _, O, _],
+    [O, _, X, _, O, _, O, _],
     [_, O, _, O, _, O, _, O],
     [O, _, O, _, O, _, O, _],
 ]
@@ -142,41 +142,41 @@ export function drawBoard() {
         // }
 
         highlightSpace(selectedSpace, PIECE_SELECTION_BORDER_COLOR)
-        highlightMovableSpacesFor(selectedSpace, Direction.RIGHT)
-        highlightMovableSpacesFor(selectedSpace, Direction.LEFT)
+        highlightMovableSpacesFor(selectedSpace, Direction.RIGHT, 1)
+        highlightMovableSpacesFor(selectedSpace, Direction.LEFT, 1)
     }
 }
 
 //input: selected space
-function highlightMovableSpacesFor(space: BoardIndex, direction: Direction) {
+function highlightMovableSpacesFor(space: BoardIndex, direction: Direction, level: number) {
     if (isSpaceInsideBoard(space)) {
         //highlight topright
         if (direction === Direction.RIGHT) {
             var topRight = getTopRightSpace(space)
-            if (isFree(topRight)) {
+            if (isFree(topRight) && level === 1) {
                 highlightSpace(topRight, FREE_SPACE_SELECTION_BORDER_COLOR)
-            } else {
+            } else if (isRemotePiece(topRight)) {
                 var topRightBehind = getTopRightSpace(topRight)
                 if (isFree(topRightBehind)) {
                     highlightSpace(topRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
                 } else {
                     return
                 }
-                highlightMovableSpacesFor(topRightBehind, Direction.RIGHT)
+                highlightMovableSpacesFor(topRightBehind, Direction.RIGHT, level + 1)
             }
         } else {
             //highlight topleft
             var topLeft = getTopLeftSpace(space)
-            if (isFree(topLeft)) {
+            if (isFree(topLeft) && level === 1) {
                 highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
-            } else {
+            } else if (isRemotePiece(topLeft)) {
                 var topLeftBehind = getTopLeftSpace(topLeft)
                 if (isFree(topLeftBehind)) {
                     highlightSpace(topLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
                 } else {
                     return
                 }
-                highlightMovableSpacesFor(topLeft, Direction.LEFT)
+                highlightMovableSpacesFor(topLeft, Direction.LEFT, level + 1)
             }
         }
     }
@@ -243,7 +243,7 @@ function isMovable(space: BoardIndex) {
             if (isFree(topLeft) || (topRight && isFree(topRight))) {
                 return true
             }
-            if (topLeft && !isFree(topLeft) && isRemotePiece(topLeft)) {
+            if (!isFree(topLeft) && isRemotePiece(topLeft)) {
                 var topLeftBehind = getTopLeftSpace(topLeft)
                 if (topLeftBehind && isFree(topLeftBehind)) {
                     return true
