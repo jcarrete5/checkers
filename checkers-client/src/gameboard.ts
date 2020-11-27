@@ -10,8 +10,10 @@ const boardCanvas = document.getElementById('board-canvas') as HTMLCanvasElement
  * CONSTANTS
  *************/
 
-const LOCAL_PIECE_COLOR = '#edf285'
-const REMOTE_PIECE_COLOR = '#fd8c04'
+const LOCAL_MAN_COLOR = '#edf285'
+const LOCAL_KING_COLOR = '#000000'
+const REMOTE_MAN_COLOR = '#fd8c04'
+const REMOTE_KING_COLOR = '#f4f4f2'
 const DARK_SPACE_COLOR = '#8db596'
 const LIGHT_SPACE_COLOR = '#bedbbb'
 const PIECE_SELECTION_BORDER_COLOR = 'red'
@@ -24,9 +26,9 @@ enum Space {
     /** A free space */
     FREE,
     /** Local player's man */
-    LOCAL,
+    LOCAL_MAN,
     /** Remote player's man */
-    REMOTE,
+    REMOTE_MAN,
     /** Local player's king */
     LOCAL_KING,
     /** Remote player's king */
@@ -35,29 +37,31 @@ enum Space {
 
 /** Enumberation of values that indicate the direction to check movable spaces. */
 enum Direction {
-    LEFT,
-    RIGHT,
+    TOP_LEFT,
+    TOP_RIGHT,
 }
 /************************
  * STATE INITIALIZATION
  ************************/
 
-const O = Space.LOCAL
-const X = Space.REMOTE
+const O = Space.LOCAL_MAN
+const X = Space.REMOTE_MAN
+const K = Space.LOCAL_KING
+const Q = Space.REMOTE_KING
 const _ = Space.FREE
 
-var gameTurn = Space.LOCAL
+var gameTurn = Space.LOCAL_MAN
 
 /** Board state */
 const board = [
-    [_, X, _, X, _, _, _, X],
+    [_, X, _, X, _, K, _, X],
     [X, _, X, _, X, _, _, _],
     [_, X, _, O, _, _, _, X],
     [_, _, _, _, X, _, _, _],
     [_, _, _, _, _, _, _, _],
     [O, _, X, _, O, _, O, _],
     [_, O, _, O, _, O, _, O],
-    [O, _, O, _, O, _, O, _],
+    [O, _, Q, _, O, _, O, _],
 ]
 
 /** Graphics context */
@@ -80,15 +84,26 @@ let selectedPiece: BoardIndex | null = null
  ***************/
 
 function isLocalMan(space: BoardIndex) {
-    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.LOCAL
+    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.LOCAL_MAN
 }
 
 function isLocalKing(space: BoardIndex) {
     return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.LOCAL_KING
 }
 
-function isRemotePiece(i: BoardIndex) {
-    return board[i.row][i.col] === Space.REMOTE || board[i.row][i.col] === Space.REMOTE_KING
+// function isRemote(space: BoardIndex) {
+//     return (
+//         (isSpaceInsideBoard(space) && board[space.row][space.col] === Space.REMOTE_KING) ||
+//         board[space.row][space.col] === Space.REMOTE_MAN
+//     )
+// }
+
+function isRemoteMan(space: BoardIndex) {
+    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.REMOTE_MAN
+}
+
+function isRemoteKing(space: BoardIndex) {
+    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.REMOTE_KING
 }
 
 function drawCircle(x: number, y: number, color: string) {
@@ -117,10 +132,14 @@ export function drawBoard() {
             const y = i * SIDE_LEN
 
             g.fillRect(x, y, SIDE_LEN, SIDE_LEN)
-            if (isRemotePiece({ row: i, col: j })) {
-                drawCircle(x, y, REMOTE_PIECE_COLOR)
-            } else if (isLocalMan({ row: i, col: j })) {
-                drawCircle(x, y, LOCAL_PIECE_COLOR)
+            if (isRemoteMan(currentSpace)) {
+                drawCircle(x, y, REMOTE_MAN_COLOR)
+            } else if (isRemoteKing(currentSpace)) {
+                drawCircle(x, y, REMOTE_KING_COLOR)
+            } else if (isLocalMan(currentSpace)) {
+                drawCircle(x, y, LOCAL_MAN_COLOR)
+            } else if (isLocalKing(currentSpace)) {
+                drawCircle(x, y, LOCAL_KING_COLOR)
             }
 
             if (!selectedPiece && isMovable(currentSpace)) {
@@ -129,48 +148,54 @@ export function drawBoard() {
         }
     }
 
-    // highlight selected piece (if any)
+    // highlight selected piece + moveable spaces (if any)
     if (selectedPiece && isLocalMan(selectedPiece)) {
         highlightSpace(selectedPiece, PIECE_SELECTION_BORDER_COLOR)
-        highlightMovableSpacesFor(selectedPiece, Direction.RIGHT, 1)
-        highlightMovableSpacesFor(selectedPiece, Direction.LEFT, 1)
+        highlightMovesFor(selectedPiece, Direction.TOP_RIGHT, 1)
+        highlightMovesFor(selectedPiece, Direction.TOP_LEFT, 1)
     }
 }
 
 //input: selected space
-function highlightMovableSpacesFor(space: BoardIndex, direction: Direction, level: number) {
+// TODO: highlight moves for local king
+function highlightMovesFor(space: BoardIndex, direction: Direction, level: number) {
     if (isSpaceInsideBoard(space)) {
-        //highlight topright
-        if (direction === Direction.RIGHT) {
-            var topRight = getTopRightSpace(space)
-            if (isFree(topRight) && level === 1) {
-                highlightSpace(topRight, FREE_SPACE_SELECTION_BORDER_COLOR)
-                moveableFreeSpaces.push({ row: topRight.row, col: topRight.col })
-            } else if (isRemotePiece(topRight)) {
-                var topRightBehind = getTopRightSpace(topRight)
-                if (isFree(topRightBehind)) {
-                    highlightSpace(topRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
-                    moveableFreeSpaces.push({ row: topRightBehind.row, col: topRightBehind.col })
-                } else {
-                    return
+        if (isLocalMan(space) || level > 1) {
+            //highlight topright
+            if (direction === Direction.TOP_RIGHT) {
+                var topRight = getTopRightSpace(space)
+                if (isFree(topRight) && level === 1) {
+                    highlightSpace(topRight, FREE_SPACE_SELECTION_BORDER_COLOR)
+                    moveableFreeSpaces.push({ row: topRight.row, col: topRight.col })
+                } else if (isRemoteMan(topRight)) {
+                    var topRightBehind = getTopRightSpace(topRight)
+                    if (isFree(topRightBehind)) {
+                        highlightSpace(topRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
+                        moveableFreeSpaces.push({
+                            row: topRightBehind.row,
+                            col: topRightBehind.col,
+                        })
+                    } else {
+                        return
+                    }
+                    highlightMovesFor(topRightBehind, Direction.TOP_RIGHT, level + 1)
                 }
-                highlightMovableSpacesFor(topRightBehind, Direction.RIGHT, level + 1)
-            }
-        } else {
-            //highlight topleft
-            var topLeft = getTopLeftSpace(space)
-            if (isFree(topLeft) && level === 1) {
-                highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
-                moveableFreeSpaces.push({ row: topLeft.row, col: topLeft.col })
-            } else if (isRemotePiece(topLeft)) {
-                var topLeftBehind = getTopLeftSpace(topLeft)
-                if (isFree(topLeftBehind)) {
-                    highlightSpace(topLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
-                    moveableFreeSpaces.push({ row: topLeftBehind.row, col: topLeftBehind.col })
-                } else {
-                    return
+            } else {
+                //highlight topleft
+                var topLeft = getTopLeftSpace(space)
+                if (isFree(topLeft) && level === 1) {
+                    highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
+                    moveableFreeSpaces.push({ row: topLeft.row, col: topLeft.col })
+                } else if (isRemoteMan(topLeft)) {
+                    var topLeftBehind = getTopLeftSpace(topLeft)
+                    if (isFree(topLeftBehind)) {
+                        highlightSpace(topLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
+                        moveableFreeSpaces.push({ row: topLeftBehind.row, col: topLeftBehind.col })
+                    } else {
+                        return
+                    }
+                    highlightMovesFor(topLeft, Direction.TOP_LEFT, level + 1)
                 }
-                highlightMovableSpacesFor(topLeft, Direction.LEFT, level + 1)
             }
         }
     }
@@ -288,7 +313,7 @@ function isFree(space: BoardIndex) {
 }
 
 function isMovable(space: BoardIndex) {
-    if (gameTurn === Space.LOCAL) {
+    if (gameTurn === Space.LOCAL_MAN) {
         if (isLocalMan(space)) {
             // check if top right or top left are free
             var topLeft = getTopLeftSpace(space)
@@ -296,13 +321,13 @@ function isMovable(space: BoardIndex) {
             if (isFree(topLeft) || (topRight && isFree(topRight))) {
                 return true
             }
-            if (!isFree(topLeft) && isRemotePiece(topLeft)) {
+            if (!isFree(topLeft) && isRemoteMan(topLeft)) {
                 var topLeftBehind = getTopLeftSpace(topLeft)
                 if (topLeftBehind && isFree(topLeftBehind)) {
                     return true
                 }
             }
-            if (!isFree(topRight) && isRemotePiece(topRight)) {
+            if (!isFree(topRight) && isRemoteMan(topRight)) {
                 var topRightBehind = getTopRightSpace(topRight)
                 if (topRightBehind && isFree(topRightBehind)) {
                     return true
