@@ -33,6 +33,10 @@ enum Space {
     REMOTE_KING,
 }
 
+enum Direction {
+    LEFT,
+    RIGHT,
+}
 /************************
  * STATE INITIALIZATION
  ************************/
@@ -45,11 +49,11 @@ var gameTurn = Space.LOCAL
 
 /** Board state */
 const board = [
-    [_, X, _, X, _, X, _, X],
-    [X, _, X, _, X, _, X, _],
-    [_, X, _, _, _, _, _, X],
+    [_, X, _, X, _, _, _, X],
+    [X, _, X, _, X, _, _, _],
+    [_, X, _, O, _, X, _, X],
     [_, _, _, _, _, _, _, _],
-    [_, _, _, X, _, X, _, _],
+    [_, _, _, X, _, _, _, _],
     [O, _, O, _, O, _, O, _],
     [_, O, _, O, _, O, _, O],
     [O, _, O, _, O, _, O, _],
@@ -123,25 +127,60 @@ export function drawBoard() {
     // highlight selected piece (if any)
     if (selectedSpace && isLocalMan(selectedSpace)) {
         //TODO: separate highlight spaces that a selected piece can move
-        var topLeft = { row: selectedSpace.row - 1, col: selectedSpace.col - 1 }
-        var topright = { row: selectedSpace.row - 1, col: selectedSpace.col + 1 }
+        // var topLeft = { row: selectedSpace.row - 1, col: selectedSpace.col - 1 }
+        // var topright = { row: selectedSpace.row - 1, col: selectedSpace.col + 1 }
 
-        if (isSpaceInsideBoard(topLeft)) {
-            if (board[topLeft.row][topLeft.col] === Space.FREE) {
-                highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
-            }
-        }
-        if (isSpaceInsideBoard(topright)) {
-            if (board[topright.row][topright.col] === Space.FREE) {
-                highlightSpace(topright, FREE_SPACE_SELECTION_BORDER_COLOR)
-            }
-        }
+        // if (isSpaceInsideBoard(topLeft)) {
+        //     if (board[topLeft.row][topLeft.col] === Space.FREE) {
+        //         highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
+        //     }
+        // }
+        // if (isSpaceInsideBoard(topright)) {
+        //     if (board[topright.row][topright.col] === Space.FREE) {
+        //         highlightSpace(topright, FREE_SPACE_SELECTION_BORDER_COLOR)
+        //     }
+        // }
 
         highlightSpace(selectedSpace, PIECE_SELECTION_BORDER_COLOR)
+        highlightMovableSpacesFor(selectedSpace, Direction.RIGHT)
+        highlightMovableSpacesFor(selectedSpace, Direction.LEFT)
     }
 }
 
-function highlightMovableSpaceFor(space: BoardIndex) {}
+//input: selected space
+function highlightMovableSpacesFor(space: BoardIndex, direction: Direction) {
+    if (isSpaceInsideBoard(space)) {
+        //highlight topright
+        if (direction === Direction.RIGHT) {
+            var topRight = getTopRightSpace(space)
+            if (isFree(topRight)) {
+                highlightSpace(topRight, FREE_SPACE_SELECTION_BORDER_COLOR)
+            } else {
+                var topRightBehind = getTopRightSpace(topRight)
+                if (isFree(topRightBehind)) {
+                    highlightSpace(topRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
+                } else {
+                    return
+                }
+                highlightMovableSpacesFor(topRightBehind, Direction.RIGHT)
+            }
+        } else {
+            //highlight topleft
+            var topLeft = getTopLeftSpace(space)
+            if (isFree(topLeft)) {
+                highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
+            } else {
+                var topLeftBehind = getTopLeftSpace(topLeft)
+                if (isFree(topLeftBehind)) {
+                    highlightSpace(topLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
+                } else {
+                    return
+                }
+                highlightMovableSpacesFor(topLeft, Direction.LEFT)
+            }
+        }
+    }
+}
 
 function getMousePosition(canvas: HTMLCanvasElement, event: MouseEvent) {
     let rect = canvas.getBoundingClientRect()
@@ -167,6 +206,7 @@ boardCanvas.addEventListener('click', (e) => {
         selectedSpace = clickedSpace
     }
     drawBoard()
+    //TODO: move piece + capture opponent piece if any
 })
 
 function isSpaceInsideBoard(space: BoardIndex) {
@@ -180,18 +220,18 @@ function getTopLeftSpace(space: BoardIndex) {
     if (isSpaceInsideBoard(space)) {
         return { row: space.row - 1, col: space.col - 1 }
     }
-    return null
+    return { row: -1, col: -1 }
 }
 
 function getTopRightSpace(space: BoardIndex) {
     if (isSpaceInsideBoard(space)) {
         return { row: space.row - 1, col: space.col + 1 }
     }
-    return null
+    return { row: -1, col: -1 }
 }
 
 function isFree(space: BoardIndex) {
-    return board[space.row][space.col] === Space.FREE
+    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.FREE
 }
 
 function isMovable(space: BoardIndex) {
@@ -200,14 +240,16 @@ function isMovable(space: BoardIndex) {
             // check if top right or top left are free
             var topLeft = getTopLeftSpace(space)
             var topRight = getTopRightSpace(space)
-            if ((topLeft && isFree(topLeft)) || (topRight && isFree(topRight))) {
+            if (isFree(topLeft) || (topRight && isFree(topRight))) {
                 return true
-            } else if (topLeft && !isFree(topLeft) && isRemotePiece(topLeft)) {
+            }
+            if (topLeft && !isFree(topLeft) && isRemotePiece(topLeft)) {
                 var topLeftBehind = getTopLeftSpace(topLeft)
                 if (topLeftBehind && isFree(topLeftBehind)) {
                     return true
                 }
-            } else if (topRight && !isFree(topRight) && isRemotePiece(topRight)) {
+            }
+            if (!isFree(topRight) && isRemotePiece(topRight)) {
                 var topRightBehind = getTopRightSpace(topRight)
                 if (topRightBehind && isFree(topRightBehind)) {
                     return true
