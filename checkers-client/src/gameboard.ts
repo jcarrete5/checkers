@@ -33,6 +33,7 @@ enum Space {
     REMOTE_KING,
 }
 
+/** Enumberation of values that indicate the direction to check movable spaces. */
 enum Direction {
     LEFT,
     RIGHT,
@@ -68,8 +69,11 @@ interface BoardIndex {
     row: number
     col: number
 }
+
+var moveableFreeSpaces: BoardIndex[] = []
+
 /** Current selected space on the board */
-let selectedSpace: BoardIndex | null = null
+let selectedPiece: BoardIndex | null = null
 
 /***************
  * FUNCTIONS
@@ -104,6 +108,7 @@ function highlightSpace(space: BoardIndex, color: string) {
 }
 
 export function drawBoard() {
+    moveableFreeSpaces = []
     for (var i = 0; i < board.length; i++) {
         for (var j = 0; j < board[i].length; j++) {
             var currentSpace = { row: i, col: j }
@@ -118,32 +123,17 @@ export function drawBoard() {
                 drawCircle(x, y, LOCAL_PIECE_COLOR)
             }
 
-            if (!selectedSpace && isMovable(currentSpace)) {
+            if (!selectedPiece && isMovable(currentSpace)) {
                 highlightSpace(currentSpace, PIECE_SELECTION_BORDER_COLOR)
             }
         }
     }
 
     // highlight selected piece (if any)
-    if (selectedSpace && isLocalMan(selectedSpace)) {
-        //TODO: separate highlight spaces that a selected piece can move
-        // var topLeft = { row: selectedSpace.row - 1, col: selectedSpace.col - 1 }
-        // var topright = { row: selectedSpace.row - 1, col: selectedSpace.col + 1 }
-
-        // if (isSpaceInsideBoard(topLeft)) {
-        //     if (board[topLeft.row][topLeft.col] === Space.FREE) {
-        //         highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
-        //     }
-        // }
-        // if (isSpaceInsideBoard(topright)) {
-        //     if (board[topright.row][topright.col] === Space.FREE) {
-        //         highlightSpace(topright, FREE_SPACE_SELECTION_BORDER_COLOR)
-        //     }
-        // }
-
-        highlightSpace(selectedSpace, PIECE_SELECTION_BORDER_COLOR)
-        highlightMovableSpacesFor(selectedSpace, Direction.RIGHT, 1)
-        highlightMovableSpacesFor(selectedSpace, Direction.LEFT, 1)
+    if (selectedPiece && isLocalMan(selectedPiece)) {
+        highlightSpace(selectedPiece, PIECE_SELECTION_BORDER_COLOR)
+        highlightMovableSpacesFor(selectedPiece, Direction.RIGHT, 1)
+        highlightMovableSpacesFor(selectedPiece, Direction.LEFT, 1)
     }
 }
 
@@ -155,10 +145,12 @@ function highlightMovableSpacesFor(space: BoardIndex, direction: Direction, leve
             var topRight = getTopRightSpace(space)
             if (isFree(topRight) && level === 1) {
                 highlightSpace(topRight, FREE_SPACE_SELECTION_BORDER_COLOR)
+                moveableFreeSpaces.push({ row: topRight.row, col: topRight.col })
             } else if (isRemotePiece(topRight)) {
                 var topRightBehind = getTopRightSpace(topRight)
                 if (isFree(topRightBehind)) {
                     highlightSpace(topRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
+                    moveableFreeSpaces.push({ row: topRightBehind.row, col: topRightBehind.col })
                 } else {
                     return
                 }
@@ -169,10 +161,12 @@ function highlightMovableSpacesFor(space: BoardIndex, direction: Direction, leve
             var topLeft = getTopLeftSpace(space)
             if (isFree(topLeft) && level === 1) {
                 highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
+                moveableFreeSpaces.push({ row: topLeft.row, col: topLeft.col })
             } else if (isRemotePiece(topLeft)) {
                 var topLeftBehind = getTopLeftSpace(topLeft)
                 if (isFree(topLeftBehind)) {
                     highlightSpace(topLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
+                    moveableFreeSpaces.push({ row: topLeftBehind.row, col: topLeftBehind.col })
                 } else {
                     return
                 }
@@ -199,15 +193,74 @@ function getClickedSquare(x: number, y: number) {
     return { row, col }
 }
 
+function areEqualSpaces(space1: BoardIndex, space2: BoardIndex) {
+    return space1.row === space2.row && space1.col === space2.col
+}
+
 boardCanvas.addEventListener('click', (e) => {
     var { x, y } = getMousePosition(boardCanvas, e)
     var clickedSpace = getClickedSquare(x, y)
     if (isLocalMan(clickedSpace) && isMovable(clickedSpace)) {
-        selectedSpace = clickedSpace
+        selectedPiece = clickedSpace
     }
+
+    if (
+        isFree(clickedSpace) &&
+        moveableFreeSpaces.findIndex(
+            (space) => space.col === clickedSpace.col && space.row === clickedSpace.row
+        ) != -1
+    ) {
+        if (selectedPiece) {
+            var bottomLeftOfClickedSpace = getBottomLeftSpce(clickedSpace)
+            var topRightOfSelectedSpace = getTopRightSpace(selectedPiece)
+
+            var bottomRightOfClickedSpace = getBottomRightSpace(clickedSpace)
+            var topLeftOfSelectedSpace = getTopLeftSpace(selectedPiece)
+
+            // move selected piece to a free space
+            if (
+                (isFree(topLeftOfSelectedSpace) &&
+                    areEqualSpaces(topLeftOfSelectedSpace, clickedSpace)) ||
+                (isFree(topRightOfSelectedSpace) &&
+                    areEqualSpaces(topRightOfSelectedSpace, clickedSpace))
+            ) {
+                board[clickedSpace.row][clickedSpace.col] = O
+                board[selectedPiece.row][selectedPiece.col] = _
+                selectedPiece = clickedSpace
+            }
+            // capture top right piece of selected piece
+            else if (areEqualSpaces(bottomLeftOfClickedSpace, topRightOfSelectedSpace)) {
+                board[bottomLeftOfClickedSpace.row][bottomLeftOfClickedSpace.col] = _
+                board[clickedSpace.row][clickedSpace.col] = O
+                board[selectedPiece.row][selectedPiece.col] = _
+                selectedPiece = clickedSpace
+            }
+            // capture top left piece of selected piece
+            else if (areEqualSpaces(bottomRightOfClickedSpace, topLeftOfSelectedSpace)) {
+                board[bottomRightOfClickedSpace.row][bottomRightOfClickedSpace.col] = _
+                board[clickedSpace.row][clickedSpace.col] = O
+                board[selectedPiece.row][selectedPiece.col] = _
+                selectedPiece = clickedSpace
+            }
+        }
+    }
+
     drawBoard()
-    //TODO: move piece + capture opponent piece if any
 })
+
+function getBottomLeftSpce(space: BoardIndex) {
+    if (isSpaceInsideBoard(space)) {
+        return { row: space.row + 1, col: space.col - 1 }
+    }
+    return { row: -1, col: -1 }
+}
+
+function getBottomRightSpace(space: BoardIndex) {
+    if (isSpaceInsideBoard(space)) {
+        return { row: space.row + 1, col: space.col + 1 }
+    }
+    return { row: -1, col: -1 }
+}
 
 function isSpaceInsideBoard(space: BoardIndex) {
     if (space.row > 7 || space.row < 0 || space.col > 7 || space.col < 0) {
@@ -260,25 +313,3 @@ function isMovable(space: BoardIndex) {
 
     return false
 }
-
-// function highlightMovablePieces() {
-//     for (var i = 0; i < board.length; i++) {
-//         for (var j = 0; j < board[i].length; j++) {
-//             if (gameTurn === Space.LOCAL) {
-//                 if (!selectedSpace && board[i][j] === Space.LOCAL) {
-//                     var topLeft = { row: i - 1, col: j - 1 }
-//                     var topright = { row: i - 1, col: j + 1 }
-
-//                     if (isSpaceInsideBoard(topLeft) || isSpaceInsideBoard(topright)) {
-//                         if (
-//                             board[topLeft.row][topLeft.col] === Space.FREE ||
-//                             board[topright.row][topright.col] === Space.FREE
-//                         ) {
-//                             highlightSpace({ row: i, col: j }, SELECTION_BORDER_COLOR)
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
