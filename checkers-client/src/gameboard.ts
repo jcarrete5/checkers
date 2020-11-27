@@ -35,10 +35,17 @@ enum Space {
     REMOTE_KING,
 }
 
+enum GameTurn {
+    REMOTE,
+    LOCAL,
+}
+
 /** Enumberation of values that indicate the direction to check movable spaces. */
 enum Direction {
     TOP_LEFT,
     TOP_RIGHT,
+    BOT_LEFT,
+    BOT_RIGHT,
 }
 /************************
  * STATE INITIALIZATION
@@ -50,16 +57,16 @@ const K = Space.LOCAL_KING
 const Q = Space.REMOTE_KING
 const _ = Space.FREE
 
-var gameTurn = Space.LOCAL_MAN
+var gameTurn = GameTurn.LOCAL
 
 /** Board state */
 const board = [
-    [_, X, _, X, _, K, _, X],
+    [_, _, _, _, _, K, _, X],
     [X, _, X, _, X, _, _, _],
-    [_, X, _, O, _, _, _, X],
-    [_, _, _, _, X, _, _, _],
+    [_, _, _, _, _, _, _, X],
+    [_, _, X, _, X, _, _, _],
     [_, _, _, _, _, _, _, _],
-    [O, _, X, _, O, _, O, _],
+    [O, _, X, _, _, _, O, _],
     [_, O, _, O, _, O, _, O],
     [O, _, Q, _, O, _, O, _],
 ]
@@ -74,7 +81,7 @@ interface BoardIndex {
     col: number
 }
 
-var moveableFreeSpaces: BoardIndex[] = []
+var validMoves: BoardIndex[] = []
 
 /** Current selected space on the board */
 let selectedPiece: BoardIndex | null = null
@@ -83,6 +90,13 @@ let selectedPiece: BoardIndex | null = null
  * FUNCTIONS
  ***************/
 
+function isLocalPiece(space: BoardIndex) {
+    return (
+        isSpaceInsideBoard(space) &&
+        (board[space.row][space.col] === Space.LOCAL_MAN ||
+            board[space.row][space.col] === Space.LOCAL_KING)
+    )
+}
 function isLocalMan(space: BoardIndex) {
     return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.LOCAL_MAN
 }
@@ -91,12 +105,13 @@ function isLocalKing(space: BoardIndex) {
     return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.LOCAL_KING
 }
 
-// function isRemote(space: BoardIndex) {
-//     return (
-//         (isSpaceInsideBoard(space) && board[space.row][space.col] === Space.REMOTE_KING) ||
-//         board[space.row][space.col] === Space.REMOTE_MAN
-//     )
-// }
+function isRemotePiece(space: BoardIndex) {
+    return (
+        isSpaceInsideBoard(space) &&
+        (board[space.row][space.col] === Space.REMOTE_KING ||
+            board[space.row][space.col] === Space.REMOTE_MAN)
+    )
+}
 
 function isRemoteMan(space: BoardIndex) {
     return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.REMOTE_MAN
@@ -123,7 +138,7 @@ function highlightSpace(space: BoardIndex, color: string) {
 }
 
 export function drawBoard() {
-    moveableFreeSpaces = []
+    validMoves = []
     for (var i = 0; i < board.length; i++) {
         for (var j = 0; j < board[i].length; j++) {
             var currentSpace = { row: i, col: j }
@@ -142,63 +157,251 @@ export function drawBoard() {
                 drawCircle(x, y, LOCAL_KING_COLOR)
             }
 
-            if (!selectedPiece && isMovable(currentSpace)) {
+            if (!selectedPiece && isPieceMovable(currentSpace)) {
                 highlightSpace(currentSpace, PIECE_SELECTION_BORDER_COLOR)
             }
         }
     }
 
-    // highlight selected piece + moveable spaces (if any)
-    if (selectedPiece && isLocalMan(selectedPiece)) {
+    if (selectedPiece) {
+        // highlight selected piece
         highlightSpace(selectedPiece, PIECE_SELECTION_BORDER_COLOR)
-        highlightMovesFor(selectedPiece, Direction.TOP_RIGHT, 1)
-        highlightMovesFor(selectedPiece, Direction.TOP_LEFT, 1)
+
+        // highlight valid moves
+        if (isLocalMan(selectedPiece)) {
+            highlightMovesForLocalMan(selectedPiece, Direction.TOP_RIGHT, 1)
+            highlightMovesForLocalMan(selectedPiece, Direction.TOP_LEFT, 1)
+        } else if (isLocalKing(selectedPiece)) {
+            // highlight valid moves
+            highlightMovesForLocalKing(selectedPiece, Direction.TOP_RIGHT, 1)
+            highlightMovesForLocalKing(selectedPiece, Direction.TOP_LEFT, 1)
+            highlightMovesForLocalKing(selectedPiece, Direction.BOT_LEFT, 1)
+            highlightMovesForLocalKing(selectedPiece, Direction.BOT_RIGHT, 1)
+        }
     }
 }
 
-//input: selected space
-// TODO: highlight moves for local king
-function highlightMovesFor(space: BoardIndex, direction: Direction, level: number) {
+// TODO: if can capture remote piece, do not highlight valid move on free space
+function highlightMovesForLocalKing(space: BoardIndex, direction: Direction, depthLevel: number) {
     if (isSpaceInsideBoard(space)) {
-        if (isLocalMan(space) || level > 1) {
-            //highlight topright
+        if (isLocalKing(space) || depthLevel > 1) {
+            //highlight top right
             if (direction === Direction.TOP_RIGHT) {
                 var topRight = getTopRightSpace(space)
-                if (isFree(topRight) && level === 1) {
+                if (
+                    isFree(topRight) &&
+                    depthLevel === 1 &&
+                    !canCaptureBotLeftRemotePiece(space) &&
+                    !canCaptureBotRightRemotePiece(space) &&
+                    !canCaptureTopLeftRemotePiece(space)
+                ) {
                     highlightSpace(topRight, FREE_SPACE_SELECTION_BORDER_COLOR)
-                    moveableFreeSpaces.push({ row: topRight.row, col: topRight.col })
-                } else if (isRemoteMan(topRight)) {
+                    validMoves.push({ row: topRight.row, col: topRight.col })
+                } else if (isRemotePiece(topRight)) {
                     var topRightBehind = getTopRightSpace(topRight)
                     if (isFree(topRightBehind)) {
                         highlightSpace(topRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
-                        moveableFreeSpaces.push({
+                        validMoves.push({
                             row: topRightBehind.row,
                             col: topRightBehind.col,
                         })
                     } else {
                         return
                     }
-                    highlightMovesFor(topRightBehind, Direction.TOP_RIGHT, level + 1)
+                    highlightMovesForLocalKing(topRightBehind, Direction.TOP_LEFT, depthLevel + 1)
+                    highlightMovesForLocalKing(topRightBehind, Direction.TOP_RIGHT, depthLevel + 1)
+                    highlightMovesForLocalKing(topRightBehind, Direction.BOT_RIGHT, depthLevel + 1)
                 }
-            } else {
-                //highlight topleft
+            } else if (direction === Direction.TOP_LEFT) {
+                //highlight top left
                 var topLeft = getTopLeftSpace(space)
-                if (isFree(topLeft) && level === 1) {
+                if (
+                    isFree(topLeft) &&
+                    depthLevel === 1 &&
+                    !canCaptureBotLeftRemotePiece(space) &&
+                    !canCaptureBotRightRemotePiece(space) &&
+                    !canCaptureTopRightRemotePiece(space)
+                ) {
                     highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
-                    moveableFreeSpaces.push({ row: topLeft.row, col: topLeft.col })
-                } else if (isRemoteMan(topLeft)) {
+                    validMoves.push({ row: topLeft.row, col: topLeft.col })
+                } else if (isRemotePiece(topLeft)) {
                     var topLeftBehind = getTopLeftSpace(topLeft)
                     if (isFree(topLeftBehind)) {
                         highlightSpace(topLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
-                        moveableFreeSpaces.push({ row: topLeftBehind.row, col: topLeftBehind.col })
+                        validMoves.push({ row: topLeftBehind.row, col: topLeftBehind.col })
                     } else {
                         return
                     }
-                    highlightMovesFor(topLeft, Direction.TOP_LEFT, level + 1)
+                    highlightMovesForLocalKing(topLeftBehind, Direction.TOP_LEFT, depthLevel + 1)
+                    highlightMovesForLocalKing(topLeftBehind, Direction.TOP_RIGHT, depthLevel + 1)
+                    highlightMovesForLocalKing(topLeftBehind, Direction.BOT_LEFT, depthLevel + 1)
+                }
+            } else if (direction === Direction.BOT_LEFT) {
+                //highlight bot left
+                var botLeft = getBottomLeftSpce(space)
+                if (
+                    isFree(botLeft) &&
+                    depthLevel === 1 &&
+                    !canCaptureTopRightRemotePiece(space) &&
+                    !canCaptureBotRightRemotePiece(space) &&
+                    !canCaptureTopLeftRemotePiece(space)
+                ) {
+                    highlightSpace(botLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
+                    validMoves.push({ row: botLeft.row, col: botLeft.col })
+                } else if (isRemotePiece(botLeft)) {
+                    var botLeftBehind = getBottomLeftSpce(botLeft)
+                    if (isFree(botLeftBehind)) {
+                        highlightSpace(botLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
+                        validMoves.push({ row: botLeftBehind.row, col: botLeftBehind.col })
+                    } else {
+                        return
+                    }
+                    highlightMovesForLocalKing(botLeftBehind, Direction.TOP_LEFT, depthLevel + 1)
+                    highlightMovesForLocalKing(botLeftBehind, Direction.BOT_LEFT, depthLevel + 1)
+                    highlightMovesForLocalKing(botLeftBehind, Direction.BOT_RIGHT, depthLevel + 1)
+                }
+            } else if (direction === Direction.BOT_RIGHT) {
+                //highlight bot right
+                var botRight = getBottomRightSpace(space)
+                if (
+                    isFree(botRight) &&
+                    depthLevel === 1 &&
+                    !canCaptureBotLeftRemotePiece(space) &&
+                    !canCaptureTopRightRemotePiece(space) &&
+                    !canCaptureTopLeftRemotePiece(space)
+                ) {
+                    highlightSpace(botRight, FREE_SPACE_SELECTION_BORDER_COLOR)
+                    validMoves.push({ row: botRight.row, col: botRight.col })
+                } else if (isRemotePiece(botRight)) {
+                    var botRightBehind = getBottomRightSpace(botRight)
+                    if (isFree(botRightBehind)) {
+                        highlightSpace(botRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
+                        validMoves.push({ row: botRightBehind.row, col: botRightBehind.col })
+                    } else {
+                        return
+                    }
+                    highlightMovesForLocalKing(botRightBehind, Direction.TOP_RIGHT, depthLevel + 1)
+                    highlightMovesForLocalKing(botRightBehind, Direction.BOT_LEFT, depthLevel + 1)
+                    highlightMovesForLocalKing(botRightBehind, Direction.BOT_RIGHT, depthLevel + 1)
                 }
             }
         }
     }
+}
+//input: selected space
+function highlightMovesForLocalMan(space: BoardIndex, direction: Direction, depthLevel: number) {
+    if (isSpaceInsideBoard(space)) {
+        if (isLocalMan(space) || depthLevel > 1) {
+            //highlight topright
+            if (direction === Direction.TOP_RIGHT) {
+                var topRight = getTopRightSpace(space)
+                if (isFree(topRight) && depthLevel === 1 && !canCaptureTopLeftRemotePiece(space)) {
+                    highlightSpace(topRight, FREE_SPACE_SELECTION_BORDER_COLOR)
+                    validMoves.push({ row: topRight.row, col: topRight.col })
+                } else if (isRemotePiece(topRight)) {
+                    var topRightBehind = getTopRightSpace(topRight)
+
+                    if (isFree(topRightBehind)) {
+                        highlightSpace(topRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
+                        validMoves.push({
+                            row: topRightBehind.row,
+                            col: topRightBehind.col,
+                        })
+                    } else {
+                        return
+                    }
+                    highlightMovesForLocalMan(topRightBehind, Direction.TOP_RIGHT, depthLevel + 1)
+                    highlightMovesForLocalMan(topRightBehind, Direction.TOP_LEFT, depthLevel + 1)
+                }
+            } else {
+                //highlight topleft
+                var topLeft = getTopLeftSpace(space)
+                if (isFree(topLeft) && depthLevel === 1 && !canCaptureTopRightRemotePiece(space)) {
+                    highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
+                    validMoves.push({ row: topLeft.row, col: topLeft.col })
+                } else if (isRemotePiece(topLeft)) {
+                    var topLeftBehind = getTopLeftSpace(topLeft)
+                    if (isFree(topLeftBehind)) {
+                        highlightSpace(topLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
+                        validMoves.push({ row: topLeftBehind.row, col: topLeftBehind.col })
+                    } else {
+                        return
+                    }
+                    highlightMovesForLocalMan(topLeftBehind, Direction.TOP_LEFT, depthLevel + 1)
+                    highlightMovesForLocalMan(topLeftBehind, Direction.TOP_RIGHT, depthLevel + 1)
+                }
+            }
+        }
+    }
+}
+
+function canCaptureRemotePiece(space: BoardIndex) {
+    if (gameTurn === GameTurn.LOCAL) {
+        if (
+            canCaptureBotLeftRemotePiece(space) ||
+            canCaptureBotRightRemotePiece(space) ||
+            canCaptureTopLeftRemotePiece(space) ||
+            canCaptureTopRightRemotePiece(space)
+        ) {
+            return true
+        }
+    }
+    return false
+}
+
+function canCaptureTopLeftRemotePiece(space: BoardIndex) {
+    if (isLocalPiece(space)) {
+        var topLeft = getTopLeftSpace(space)
+        if (isRemotePiece(topLeft)) {
+            var topLeftBehind = getTopLeftSpace(topLeft)
+            if (isFree(topLeftBehind)) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+function canCaptureTopRightRemotePiece(space: BoardIndex) {
+    if (isLocalPiece(space)) {
+        var topRight = getTopRightSpace(space)
+        if (isRemotePiece(topRight)) {
+            var topRightBehind = getTopRightSpace(topRight)
+            if (isFree(topRightBehind)) {
+                return true
+            }
+        }
+    }
+
+    return false
+}
+
+function canCaptureBotRightRemotePiece(space: BoardIndex) {
+    if (isLocalPiece(space)) {
+        var botRight = getBottomRightSpace(space)
+        if (isRemotePiece(botRight)) {
+            var botRightBehind = getBottomRightSpace(botRight)
+            if (isFree(botRightBehind)) {
+                return true
+            }
+        }
+    }
+
+    return false
+}
+
+function canCaptureBotLeftRemotePiece(space: BoardIndex) {
+    if (isLocalPiece(space)) {
+        var botLeft = getBottomLeftSpce(space)
+        if (isRemotePiece(botLeft)) {
+            var botLeftBehind = getBottomLeftSpce(botLeft)
+            if (isFree(botLeftBehind)) {
+                return true
+            }
+        }
+    }
+
+    return false
 }
 
 function getMousePosition(canvas: HTMLCanvasElement, event: MouseEvent) {
@@ -225,13 +428,13 @@ function areEqualSpaces(space1: BoardIndex, space2: BoardIndex) {
 boardCanvas.addEventListener('click', (e) => {
     var { x, y } = getMousePosition(boardCanvas, e)
     var clickedSpace = getClickedSquare(x, y)
-    if (isLocalMan(clickedSpace) && isMovable(clickedSpace)) {
+    if ((isLocalMan(clickedSpace) || isLocalKing(clickedSpace)) && isPieceMovable(clickedSpace)) {
         selectedPiece = clickedSpace
     }
 
     if (
         isFree(clickedSpace) &&
-        moveableFreeSpaces.findIndex(
+        validMoves.findIndex(
             (space) => space.col === clickedSpace.col && space.row === clickedSpace.row
         ) != -1
     ) {
@@ -312,25 +515,47 @@ function isFree(space: BoardIndex) {
     return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.FREE
 }
 
-function isMovable(space: BoardIndex) {
-    if (gameTurn === Space.LOCAL_MAN) {
-        if (isLocalMan(space)) {
+function isPieceMovable(space: BoardIndex) {
+    if (gameTurn === GameTurn.LOCAL) {
+        var topLeft = getTopLeftSpace(space)
+        var topRight = getTopRightSpace(space)
+        if (isLocalMan(space) || isLocalKing(space)) {
             // check if top right or top left are free
-            var topLeft = getTopLeftSpace(space)
-            var topRight = getTopRightSpace(space)
-            if (isFree(topLeft) || (topRight && isFree(topRight))) {
+            if (isFree(topLeft) || isFree(topRight)) {
                 return true
             }
-            if (!isFree(topLeft) && isRemoteMan(topLeft)) {
+            if (!isFree(topLeft) && isRemotePiece(topLeft)) {
                 var topLeftBehind = getTopLeftSpace(topLeft)
                 if (topLeftBehind && isFree(topLeftBehind)) {
                     return true
                 }
             }
-            if (!isFree(topRight) && isRemoteMan(topRight)) {
+            if (!isFree(topRight) && isRemotePiece(topRight)) {
                 var topRightBehind = getTopRightSpace(topRight)
                 if (topRightBehind && isFree(topRightBehind)) {
                     return true
+                }
+            }
+
+            if (isLocalKing(space)) {
+                var botLeft = getBottomLeftSpce(space)
+                var botRight = getBottomRightSpace(space)
+
+                // check if bot right or bot left are free
+                if (isFree(botLeft) || isFree(botRight)) {
+                    return true
+                }
+                if (!isFree(botLeft) && isRemotePiece(botLeft)) {
+                    var botLeftBehind = getBottomLeftSpce(botLeft)
+                    if (botLeftBehind && isFree(botLeftBehind)) {
+                        return true
+                    }
+                }
+                if (!isFree(botRight) && isRemotePiece(botRight)) {
+                    var botRightBehind = getTopRightSpace(botRight)
+                    if (botRightBehind && isFree(botRightBehind)) {
+                        return true
+                    }
                 }
             }
         }
