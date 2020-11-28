@@ -11,7 +11,7 @@
     "build": "webpack",
     "deploy": "gh-pages -d public -u 'Jason <jasoncarrete5@gmail.com>'",
     "precommit": "lint-staged",
-    "fmt": "prettier --write './**/*.js'"
+    "fmt": "prettier --write './src/*.ts'"
   },
   "dependencies": {
     "aws-sdk": "^2.774.0"
