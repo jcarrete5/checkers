@@ -23,4 +23,9 @@ module.exports = {
   devServer: {
     contentBase: path.join(__dirname, 'public'),
   },
+  performance: {
+    maxAssetSize: 3000000,
+    maxEntrypointSize: 3000000,
+    hints: 'warning'
+  }
 }
