@@ -448,11 +448,11 @@ function movePiece(from: BoardIndex, to: BoardIndex, middle: BoardIndex | null) 
 }
 
 boardCanvas.addEventListener('click', (e) => {
-    validMoves = []
     var { x, y } = getMousePosition(boardCanvas, e)
     var clickedSpace = getClickedSquare(x, y)
     if (isLocalPiece(clickedSpace) && isPieceMovable(clickedSpace)) {
         selectedPiece = clickedSpace
+        validMoves = []
     }
 
     if (
