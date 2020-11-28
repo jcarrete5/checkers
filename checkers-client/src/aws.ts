@@ -50,11 +50,7 @@ async function publishSDPOffer(gameCode: string, offer: RTCSessionDescriptionIni
         },
         TableName: TABLE_NAME
     } as DynamoDB.PutItemInput
-    try {
-        await db.putItem(params).promise()
-    } catch (err) {
-        throw err
-    }
+    await db.putItem(params).promise()
 }
 
 async function waitForSDPAnswer(gameCode: string) {
@@ -64,18 +60,13 @@ async function waitForSDPAnswer(gameCode: string) {
             ProjectionExpression: 'Answer',
             TableName: TABLE_NAME
         } as DynamoDB.GetItemInput
-        try {
-            const res = await db.getItem(params).promise()
-            if (!res.Item) {
-                // Sleep and try again
-                await sleep(1000)
-                continue
-            } else {
-                const answer = res.Item.Answer as string
-                return JSON.parse(answer) as RTCSessionDescriptionInit
-            }
-        } catch (err) {
-            throw err
+        const res = await db.getItem(params).promise()
+        if (res.Item && res.Item.Answer && res.Item.Answer.S) {
+            const answer = res.Item.Answer.S
+            return JSON.parse(answer) as RTCSessionDescriptionInit
+        } else {
+            // Sleep and try again
+            await sleep(1000)
         }
     }
 }
@@ -88,11 +79,7 @@ async function postICECandidate(gameCode: string, side: Side, candidate: RTCIceC
         ExpressionAttributeValues: { ':c': { SS: [JSON.stringify(candidate.toJSON())] } },
         TableName: TABLE_NAME
     } as DynamoDB.UpdateItemInput
-    try {
-        await db.updateItem(params).promise()
-    } catch (err) {
-        throw err
-    }
+    await db.updateItem(params).promise()
 }
 
 /** Yield ICE candidates from DynamoDB as they are discovered. */
@@ -104,21 +91,17 @@ async function* collectPeerICECandidates(gameCode: string, side: Side) {
             ProjectionExpression: side,
             TableName: TABLE_NAME
         } as DynamoDB.GetItemInput
-        try {
-            const res = await db.getItem(params).promise()
-            if (res.Item && res.Item[side].SS) {
-                for (const c of res.Item[side].SS ?? []) {
-                    if (!yieldedCandidates.has(c)) {
-                        yield JSON.parse(c) as RTCIceCandidateInit
-                        yieldedCandidates.add(c)
-                    }
+        const res = await db.getItem(params).promise()
+        if (res.Item && res.Item[side] && res.Item[side].SS) {
+            for (const c of res.Item[side].SS ?? []) {
+                if (!yieldedCandidates.has(c)) {
+                    yield JSON.parse(c) as RTCIceCandidateInit
+                    yieldedCandidates.add(c)
                 }
             }
-            // Limiting request rate
-            await sleep(1000)
-        } catch (err) {
-            throw err
         }
+        // Limiting request rate
+        await sleep(1000)
     }
 }
 
@@ -129,6 +112,9 @@ async function* collectPeerICECandidates(gameCode: string, side: Side) {
  */
 async function establishConnection(gameCode: string, side: Side) {
     // Push ICE candidates to AWS when they are discovered
+    peerConn.addEventListener('icegatheringstatechange', event => {
+        console.log(peerConn.iceGatheringState)
+    })
     peerConn.addEventListener('icecandidate', async event => {
         if (event.candidate) {
             await postICECandidate(gameCode, side, event.candidate)
@@ -179,53 +165,37 @@ export async function* createGame() {
     await establishConnection(gameCode, Side.HOST)
 }
 
-export async function joinGame(remoteGameCode: string | null) {
-    // gameCode = validateGameCode(remoteGameCode)
-    // if (state != State.DISCONNECTED) throw 'Invalid state: must be disconnected'
-
-    // // Find the room SDP offer
-    // let params = {
-    //     Key: {
-    //         'GameCode': { N: gameCode.toString() }
-    //     },
-    //     ProjectionExpression: 'Offer',
-    //     TableName: TABLE_NAME
-    // } as DynamoDB.GetItemInput
-    // let res
-    // try {
-    //     res = await db.getItem(params).promise()
-    //     if (!res.Item) {
-    //         throw `Failed to find room '${gameCode}'`
-    //     }
-    // } catch (err) {
-    //     throw err
-    // }
-
-    // // Accept the SDP offer and reply
-    // const offer = JSON.parse(res.Item.Offer as string) as RTCSessionDescriptionInit
-    // const answer = await acceptSDPOffer(offer)
-    // params = {
-    //     Key: {
-    //         'GameCode': { N: gameCode.toString() }
-    //     },
-    //     UpdateExpression: 'SET Answer = :a',
-    //     ExpressionAttributeValues: {
-    //         ':a': { S: JSON.stringify(answer) }
-    //     },
-    //     TableName: TABLE_NAME
-    // } as DynamoDB.UpdateItemInput
-    // try {
-    //     await db.updateItem(params).promise()
-    // } catch (err) {
-    //     throw err
-    // }
+async function getSDPOffer(gameCode: string) {
+    const params = {
+        Key: { 'GameCode': { S: gameCode } },
+        ProjectionExpression: 'Offer',
+        TableName: TABLE_NAME
+    } as DynamoDB.GetItemInput
+    const res = await db.getItem(params).promise()
+    if (res.Item && res.Item.Offer && res.Item.Offer.S) {
+        const offer = res.Item.Offer.S
+        return JSON.parse(offer) as RTCSessionDescriptionInit
+    } else {
+        throw 'No SDP offer was found'
+    }
 }
 
-export async function test() {
-    // const seq = collectPeerICECandidates('0001', Side.HOST)
-    // console.log(await seq.next())
-    // const offer = await peerConn.createOffer()
-    // await publishSDPOffer('0001', offer)
-    // await posticecandidate('0001', side.host, 'teststring1')
-    // await posticecandidate('0001', side.host, 'teststring2')
+async function publishSDPAnswer(gameCode: string, answer: RTCSessionDescriptionInit) {
+    const params = {
+        Key: { 'GameCode': { S: gameCode} },
+        UpdateExpression: 'SET Answer = :a',
+        ExpressionAttributeValues: { ':a': { S: JSON.stringify(answer) } },
+        TableName: TABLE_NAME
+    } as DynamoDB.UpdateItemInput
+    await db.updateItem(params).promise()
+}
+
+export async function joinGame(remoteGameCode: string | null) {
+    const gameCode = validateGameCode(remoteGameCode)
+    const offer = await getSDPOffer(gameCode)
+    await peerConn.setRemoteDescription(offer)
+    const answer = await peerConn.createAnswer()
+    await peerConn.setLocalDescription(answer)
+    await publishSDPAnswer(gameCode, answer)
+    await establishConnection(gameCode, Side.PEER)
 }

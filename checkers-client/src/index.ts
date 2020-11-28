@@ -5,7 +5,7 @@
  */
 
 import { drawBoard } from './gameboard'
-import { createGame, joinGame, test } from './aws'
+import { createGame, joinGame } from './aws'
 
 const createGameBtn = document.getElementById('btn-create-game') as HTMLButtonElement
 const joinGameBtn = document.getElementById('btn-join-game') as HTMLButtonElement
@@ -14,11 +14,14 @@ const joinGameBtn = document.getElementById('btn-join-game') as HTMLButtonElemen
 createGameBtn.addEventListener('click', async ev => {
     const createGameSeq = createGame()
     try {
-        const gameCode = await createGameSeq.next()
-        alert(`Game code: ${gameCode}`)
-        await createGameSeq.next()
+        const gameCode = (await createGameSeq.next()).value
+        if (gameCode) {
+            alert(`Game code: ${gameCode}`)
+            await createGameSeq.next()
+        } else {
+            throw 'Internal error generating gameCode'
+        }
     } catch (err) {
-        alert(err)
         throw err
     }
 })
@@ -29,10 +32,8 @@ joinGameBtn.addEventListener('click', async ev => {
     try {
         await joinGame(gameCode)
     } catch (err) {
-        alert(err)
         throw err
     }
 })
 
 drawBoard()
-test()
