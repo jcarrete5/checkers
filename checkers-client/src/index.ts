@@ -13,27 +13,19 @@ const joinGameBtn = document.getElementById('btn-join-game') as HTMLButtonElemen
 /* btn-create-game click event listener */
 createGameBtn.addEventListener('click', async ev => {
     const createGameSeq = createGame()
-    try {
-        const gameCode = (await createGameSeq.next()).value
-        if (gameCode) {
-            alert(`Game code: ${gameCode}`)
-            await createGameSeq.next()
-        } else {
-            throw 'Internal error generating gameCode'
-        }
-    } catch (err) {
-        throw err
+    const gameCode = (await createGameSeq.next()).value
+    if (gameCode) {
+        alert(`Game code: ${gameCode}`)
+        await createGameSeq.next()
+    } else {
+        throw 'Internal error generating gameCode'
     }
 })
 
 /* btn-join-game click event listener */
 joinGameBtn.addEventListener('click', async ev => {
     const gameCode = prompt('Enter a game code')
-    try {
-        await joinGame(gameCode)
-    } catch (err) {
-        throw err
-    }
+    await joinGame(gameCode)
 })
 
 drawBoard()

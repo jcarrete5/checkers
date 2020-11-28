@@ -4,26 +4,25 @@
  * Module for managing P2P communication.
  */
 
+import iceServers from "./stun";
+import { postICECandidate } from "./aws";
+
 /* P2P channel used to communicate with other player. */
-export const peerConn = new RTCPeerConnection({
-    'iceServers': [
-        {'urls': 'stun:stun.l.google.com:19302'}
-    ]
+export const peerConn = new RTCPeerConnection({ iceServers })
+
+peerConn.addEventListener('icegatheringstatechange', _ => {
+    console.log('Gathering state change:', peerConn.iceGatheringState)
 })
 
+// Push ICE candidates to AWS when they are discovered
+peerConn.addEventListener('icecandidate', async event => {
+    console.log('icecandidate:', event)
+    if (event.candidate) {
+        // await postICECandidate(gameCode, side, event.candidate)
+        console.log('Posted an ICE candidate:', event.candidate)
+    }
+})
 
-// export async function acceptSDPOffer(offer: RTCSessionDescriptionInit) {
-//     if (state != State.DISCONNECTED) {
-//         throw 'Invalid state: must be DISCONNECTED'
-//     }
-//     await peerConn.setRemoteDescription(offer)
-//     const answer = await peerConn.createAnswer()
-//     await peerConn.setLocalDescription(answer)
-//     state = State.AWAIT_HOST_ICE_CANDIDATES
-//     listenForICECandidates()
-//     return answer
-// }
-
-export async function addRemoteICECandidate() {
-
-}
+peerConn.addEventListener('iceconnectionstatechange', async event => {
+    console.log('iceconnectionstatechange:', peerConn.iceConnectionState)
+})

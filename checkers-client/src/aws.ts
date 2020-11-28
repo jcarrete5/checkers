@@ -71,7 +71,7 @@ async function waitForSDPAnswer(gameCode: string) {
     }
 }
 
-async function postICECandidate(gameCode: string, side: Side, candidate: RTCIceCandidate) {
+export async function postICECandidate(gameCode: string, side: Side, candidate: RTCIceCandidate) {
     const params = {
         Key: { 'GameCode': { S: gameCode } },
         UpdateExpression: 'ADD #C :c',
@@ -112,9 +112,6 @@ async function* collectPeerICECandidates(gameCode: string, side: Side) {
  */
 async function establishConnection(gameCode: string, side: Side) {
     // Push ICE candidates to AWS when they are discovered
-    peerConn.addEventListener('icegatheringstatechange', event => {
-        console.log(peerConn.iceGatheringState)
-    })
     peerConn.addEventListener('icecandidate', async event => {
         if (event.candidate) {
             await postICECandidate(gameCode, side, event.candidate)
