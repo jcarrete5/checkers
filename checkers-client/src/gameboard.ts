@@ -4,22 +4,49 @@
  * Module for implementing rendering and maintaining state of the gameboard.
  */
 
-import { Space, GameTurn, Direction } from './enum';
-import { boardCanvas } from './boardCanvas';
-import { 
-    LOCAL_MAN_COLOR,
-    LOCAL_KING_COLOR,
-    REMOTE_MAN_COLOR,
-    REMOTE_KING_COLOR,
-    DARK_SPACE_COLOR,
-    LIGHT_SPACE_COLOR,
-    PIECE_SELECTION_BORDER_COLOR,
-    FREE_SPACE_SELECTION_BORDER_COLOR,
-    SELECTION_BORDER_WIDTH,
-    SIDE_LEN
-} from './constants';
+const boardCanvas = document.getElementById('board-canvas') as HTMLCanvasElement
 
+/*************
+ * CONSTANTS
+ *************/
 
+const LOCAL_MAN_COLOR = '#edf285'
+const LOCAL_KING_COLOR = '#000000'
+const REMOTE_MAN_COLOR = '#fd8c04'
+const REMOTE_KING_COLOR = '#f4f4f2'
+const DARK_SPACE_COLOR = '#8db596'
+const LIGHT_SPACE_COLOR = '#bedbbb'
+const PIECE_SELECTION_BORDER_COLOR = 'red'
+const FREE_SPACE_SELECTION_BORDER_COLOR = 'blue'
+const SELECTION_BORDER_WIDTH = 2
+const SIDE_LEN = boardCanvas.width / 8
+
+/** Enumeration of values that can occupy a space on the board. */
+enum Space {
+    /** A free space */
+    FREE,
+    /** Local player's man */
+    LOCAL_MAN,
+    /** Remote player's man */
+    REMOTE_MAN,
+    /** Local player's king */
+    LOCAL_KING,
+    /** Remote player's king */
+    REMOTE_KING,
+}
+
+enum GameTurn {
+    REMOTE,
+    LOCAL,
+}
+
+/** Enumberation of values that indicate the direction to check movable spaces. */
+enum Direction {
+    TOP_LEFT,
+    TOP_RIGHT,
+    BOT_LEFT,
+    BOT_RIGHT,
+}
 /************************
  * STATE INITIALIZATION
  ************************/
