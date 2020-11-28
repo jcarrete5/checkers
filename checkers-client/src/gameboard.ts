@@ -57,7 +57,7 @@ const K = Space.LOCAL_KING
 const Q = Space.REMOTE_KING
 const _ = Space.FREE
 
-var gameTurn = GameTurn.LOCAL
+let gameTurn = GameTurn.LOCAL
 
 /** Board state */
 const board = [
@@ -81,7 +81,7 @@ interface BoardIndex {
     col: number
 }
 
-var validMoves: BoardIndex[] = []
+let validMoves: BoardIndex[] = []
 
 /** Current selected space on the board */
 let selectedPiece: BoardIndex | null = null
@@ -92,33 +92,31 @@ let selectedPiece: BoardIndex | null = null
 
 function isLocalPiece(space: BoardIndex) {
     return (
-        isSpaceInsideBoard(space) &&
-        (board[space.row][space.col] === Space.LOCAL_MAN ||
-            board[space.row][space.col] === Space.LOCAL_KING)
+        board[space.row][space.col] === Space.LOCAL_MAN ||
+        board[space.row][space.col] === Space.LOCAL_KING
     )
 }
 function isLocalMan(space: BoardIndex) {
-    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.LOCAL_MAN
+    return board[space.row][space.col] === Space.LOCAL_MAN
 }
 
 function isLocalKing(space: BoardIndex) {
-    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.LOCAL_KING
+    return board[space.row][space.col] === Space.LOCAL_KING
 }
 
 function isRemotePiece(space: BoardIndex) {
     return (
-        isSpaceInsideBoard(space) &&
-        (board[space.row][space.col] === Space.REMOTE_KING ||
-            board[space.row][space.col] === Space.REMOTE_MAN)
+        board[space.row][space.col] === Space.REMOTE_KING ||
+        board[space.row][space.col] === Space.REMOTE_MAN
     )
 }
 
 function isRemoteMan(space: BoardIndex) {
-    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.REMOTE_MAN
+    return board[space.row][space.col] === Space.REMOTE_MAN
 }
 
 function isRemoteKing(space: BoardIndex) {
-    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.REMOTE_KING
+    return board[space.row][space.col] === Space.REMOTE_KING
 }
 
 function drawCircle(x: number, y: number, color: string) {
@@ -138,10 +136,9 @@ function highlightSpace(space: BoardIndex, color: string) {
 }
 
 export function drawBoard() {
-    validMoves = []
-    for (var i = 0; i < board.length; i++) {
-        for (var j = 0; j < board[i].length; j++) {
-            var currentSpace = { row: i, col: j }
+    for (let i = 0; i < board.length; i++) {
+        for (let j = 0; j < board[i].length; j++) {
+            let currentSpace = { row: i, col: j }
             g.fillStyle = (i + j) % 2 ? DARK_SPACE_COLOR : LIGHT_SPACE_COLOR
             const x = j * SIDE_LEN
             const y = i * SIDE_LEN
@@ -181,13 +178,12 @@ export function drawBoard() {
     }
 }
 
-// TODO: if can capture remote piece, do not highlight valid move on free space
 function highlightMovesForLocalKing(space: BoardIndex, direction: Direction, depthLevel: number) {
     if (isSpaceInsideBoard(space)) {
         if (isLocalKing(space) || depthLevel > 1) {
             //highlight top right
             if (direction === Direction.TOP_RIGHT) {
-                var topRight = getTopRightSpace(space)
+                let topRight = getTopRightSpace(space)
                 if (
                     isFree(topRight) &&
                     depthLevel === 1 &&
@@ -197,8 +193,8 @@ function highlightMovesForLocalKing(space: BoardIndex, direction: Direction, dep
                 ) {
                     highlightSpace(topRight, FREE_SPACE_SELECTION_BORDER_COLOR)
                     validMoves.push({ row: topRight.row, col: topRight.col })
-                } else if (isRemotePiece(topRight)) {
-                    var topRightBehind = getTopRightSpace(topRight)
+                } else if (isSpaceInsideBoard(topRight) && isRemotePiece(topRight)) {
+                    let topRightBehind = getTopRightSpace(topRight)
                     if (isFree(topRightBehind)) {
                         highlightSpace(topRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
                         validMoves.push({
@@ -214,7 +210,7 @@ function highlightMovesForLocalKing(space: BoardIndex, direction: Direction, dep
                 }
             } else if (direction === Direction.TOP_LEFT) {
                 //highlight top left
-                var topLeft = getTopLeftSpace(space)
+                let topLeft = getTopLeftSpace(space)
                 if (
                     isFree(topLeft) &&
                     depthLevel === 1 &&
@@ -224,8 +220,8 @@ function highlightMovesForLocalKing(space: BoardIndex, direction: Direction, dep
                 ) {
                     highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
                     validMoves.push({ row: topLeft.row, col: topLeft.col })
-                } else if (isRemotePiece(topLeft)) {
-                    var topLeftBehind = getTopLeftSpace(topLeft)
+                } else if (isSpaceInsideBoard(topLeft) && isRemotePiece(topLeft)) {
+                    let topLeftBehind = getTopLeftSpace(topLeft)
                     if (isFree(topLeftBehind)) {
                         highlightSpace(topLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
                         validMoves.push({ row: topLeftBehind.row, col: topLeftBehind.col })
@@ -238,7 +234,7 @@ function highlightMovesForLocalKing(space: BoardIndex, direction: Direction, dep
                 }
             } else if (direction === Direction.BOT_LEFT) {
                 //highlight bot left
-                var botLeft = getBottomLeftSpace(space)
+                let botLeft = getBottomLeftSpace(space)
                 if (
                     isFree(botLeft) &&
                     depthLevel === 1 &&
@@ -248,8 +244,8 @@ function highlightMovesForLocalKing(space: BoardIndex, direction: Direction, dep
                 ) {
                     highlightSpace(botLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
                     validMoves.push({ row: botLeft.row, col: botLeft.col })
-                } else if (isRemotePiece(botLeft)) {
-                    var botLeftBehind = getBottomLeftSpace(botLeft)
+                } else if (isSpaceInsideBoard(botLeft) && isRemotePiece(botLeft)) {
+                    let botLeftBehind = getBottomLeftSpace(botLeft)
                     if (isFree(botLeftBehind)) {
                         highlightSpace(botLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
                         validMoves.push({ row: botLeftBehind.row, col: botLeftBehind.col })
@@ -262,7 +258,7 @@ function highlightMovesForLocalKing(space: BoardIndex, direction: Direction, dep
                 }
             } else if (direction === Direction.BOT_RIGHT) {
                 //highlight bot right
-                var botRight = getBottomRightSpace(space)
+                let botRight = getBottomRightSpace(space)
                 if (
                     isFree(botRight) &&
                     depthLevel === 1 &&
@@ -272,8 +268,8 @@ function highlightMovesForLocalKing(space: BoardIndex, direction: Direction, dep
                 ) {
                     highlightSpace(botRight, FREE_SPACE_SELECTION_BORDER_COLOR)
                     validMoves.push({ row: botRight.row, col: botRight.col })
-                } else if (isRemotePiece(botRight)) {
-                    var botRightBehind = getBottomRightSpace(botRight)
+                } else if (isSpaceInsideBoard(botRight) && isRemotePiece(botRight)) {
+                    let botRightBehind = getBottomRightSpace(botRight)
                     if (isFree(botRightBehind)) {
                         highlightSpace(botRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
                         validMoves.push({ row: botRightBehind.row, col: botRightBehind.col })
@@ -294,12 +290,12 @@ function highlightMovesForLocalMan(space: BoardIndex, direction: Direction, dept
         if (isLocalMan(space) || depthLevel > 1) {
             //highlight topright
             if (direction === Direction.TOP_RIGHT) {
-                var topRight = getTopRightSpace(space)
+                let topRight = getTopRightSpace(space)
                 if (isFree(topRight) && depthLevel === 1 && !canCaptureTopLeftRemotePiece(space)) {
                     highlightSpace(topRight, FREE_SPACE_SELECTION_BORDER_COLOR)
                     validMoves.push({ row: topRight.row, col: topRight.col })
-                } else if (isRemotePiece(topRight)) {
-                    var topRightBehind = getTopRightSpace(topRight)
+                } else if (isSpaceInsideBoard(topRight) && isRemotePiece(topRight)) {
+                    let topRightBehind = getTopRightSpace(topRight)
 
                     if (isFree(topRightBehind)) {
                         highlightSpace(topRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
@@ -315,12 +311,12 @@ function highlightMovesForLocalMan(space: BoardIndex, direction: Direction, dept
                 }
             } else {
                 //highlight topleft
-                var topLeft = getTopLeftSpace(space)
+                let topLeft = getTopLeftSpace(space)
                 if (isFree(topLeft) && depthLevel === 1 && !canCaptureTopRightRemotePiece(space)) {
                     highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
                     validMoves.push({ row: topLeft.row, col: topLeft.col })
-                } else if (isRemotePiece(topLeft)) {
-                    var topLeftBehind = getTopLeftSpace(topLeft)
+                } else if (isSpaceInsideBoard(topLeft) && isRemotePiece(topLeft)) {
+                    let topLeftBehind = getTopLeftSpace(topLeft)
                     if (isFree(topLeftBehind)) {
                         highlightSpace(topLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
                         validMoves.push({ row: topLeftBehind.row, col: topLeftBehind.col })
@@ -335,25 +331,11 @@ function highlightMovesForLocalMan(space: BoardIndex, direction: Direction, dept
     }
 }
 
-function canCaptureRemotePiece(space: BoardIndex) {
-    if (gameTurn === GameTurn.LOCAL) {
-        if (
-            canCaptureBotLeftRemotePiece(space) ||
-            canCaptureBotRightRemotePiece(space) ||
-            canCaptureTopLeftRemotePiece(space) ||
-            canCaptureTopRightRemotePiece(space)
-        ) {
-            return true
-        }
-    }
-    return false
-}
-
 function canCaptureTopLeftRemotePiece(space: BoardIndex) {
     if (isLocalPiece(space)) {
-        var topLeft = getTopLeftSpace(space)
-        if (isRemotePiece(topLeft)) {
-            var topLeftBehind = getTopLeftSpace(topLeft)
+        let topLeft = getTopLeftSpace(space)
+        if (isSpaceInsideBoard(topLeft) && isRemotePiece(topLeft)) {
+            let topLeftBehind = getTopLeftSpace(topLeft)
             if (isFree(topLeftBehind)) {
                 return true
             }
@@ -364,9 +346,9 @@ function canCaptureTopLeftRemotePiece(space: BoardIndex) {
 
 function canCaptureTopRightRemotePiece(space: BoardIndex) {
     if (isLocalPiece(space)) {
-        var topRight = getTopRightSpace(space)
-        if (isRemotePiece(topRight)) {
-            var topRightBehind = getTopRightSpace(topRight)
+        let topRight = getTopRightSpace(space)
+        if (isSpaceInsideBoard(topRight) && isRemotePiece(topRight)) {
+            let topRightBehind = getTopRightSpace(topRight)
             if (isFree(topRightBehind)) {
                 return true
             }
@@ -381,9 +363,9 @@ function canCaptureBotRightRemotePiece(space: BoardIndex) {
         if (isLocalMan(space)) {
             return false
         }
-        var botRight = getBottomRightSpace(space)
-        if (isRemotePiece(botRight)) {
-            var botRightBehind = getBottomRightSpace(botRight)
+        let botRight = getBottomRightSpace(space)
+        if (isSpaceInsideBoard(botRight) && isRemotePiece(botRight)) {
+            let botRightBehind = getBottomRightSpace(botRight)
             if (isFree(botRightBehind)) {
                 return true
             }
@@ -398,9 +380,9 @@ function canCaptureBotLeftRemotePiece(space: BoardIndex) {
         if (isLocalMan(space)) {
             return false
         }
-        var botLeft = getBottomLeftSpace(space)
-        if (isRemotePiece(botLeft)) {
-            var botLeftBehind = getBottomLeftSpace(botLeft)
+        let botLeft = getBottomLeftSpace(space)
+        if (isSpaceInsideBoard(botLeft) && isRemotePiece(botLeft)) {
+            let botLeftBehind = getBottomLeftSpace(botLeft)
             if (isFree(botLeftBehind)) {
                 return true
             }
@@ -452,18 +434,24 @@ function isBotRightFree(space: BoardIndex) {
 }
 
 function movePiece(from: BoardIndex, to: BoardIndex, middle: BoardIndex | null) {
-    board[to.row][to.col] = isLocalMan(from) ? O : K
-    board[from.row][from.col] = _
+    board[to.row][to.col] = isLocalMan(from) ? Space.LOCAL_MAN : Space.LOCAL_KING
+    board[from.row][from.col] = Space.FREE
     if (middle) {
-        board[middle.row][middle.col] = _
+        board[middle.row][middle.col] = Space.FREE
     }
+
     selectedPiece = to
+    // transform to king
+    if (to.row === 0 && isLocalMan(selectedPiece)) {
+        board[to.row][to.col] = Space.LOCAL_KING
+    }
 }
 
 boardCanvas.addEventListener('click', (e) => {
+    validMoves = []
     var { x, y } = getMousePosition(boardCanvas, e)
     var clickedSpace = getClickedSquare(x, y)
-    if ((isLocalMan(clickedSpace) || isLocalKing(clickedSpace)) && isPieceMovable(clickedSpace)) {
+    if (isLocalPiece(clickedSpace) && isPieceMovable(clickedSpace)) {
         selectedPiece = clickedSpace
     }
 
@@ -474,11 +462,11 @@ boardCanvas.addEventListener('click', (e) => {
         ) != -1
     ) {
         if (selectedPiece) {
-            var bottomLeftOfClickedSpace = getBottomLeftSpace(clickedSpace)
-            var topRightOfSelectedSpace = getTopRightSpace(selectedPiece)
+            let bottomLeftOfClickedSpace = getBottomLeftSpace(clickedSpace)
+            let topRightOfSelectedSpace = getTopRightSpace(selectedPiece)
 
-            var bottomRightOfClickedSpace = getBottomRightSpace(clickedSpace)
-            var topLeftOfSelectedSpace = getTopLeftSpace(selectedPiece)
+            let bottomRightOfClickedSpace = getBottomRightSpace(clickedSpace)
+            let topLeftOfSelectedSpace = getTopLeftSpace(selectedPiece)
 
             if (
                 (isTopLeftFree(selectedPiece) || isTopRightFree(selectedPiece)) &&
@@ -495,11 +483,11 @@ boardCanvas.addEventListener('click', (e) => {
                 movePiece(selectedPiece, clickedSpace, bottomRightOfClickedSpace)
             } else {
                 if (isLocalKing(selectedPiece)) {
-                    var botLeftOfSelectedSpace = getBottomLeftSpace(selectedPiece)
-                    var botRightOfSelectedSpace = getBottomRightSpace(selectedPiece)
+                    let botLeftOfSelectedSpace = getBottomLeftSpace(selectedPiece)
+                    let botRightOfSelectedSpace = getBottomRightSpace(selectedPiece)
 
-                    var topLeftOfClickedSpace = getTopLeftSpace(clickedSpace)
-                    var topRightOfClickedSpace = getTopRightSpace(clickedSpace)
+                    let topLeftOfClickedSpace = getTopLeftSpace(clickedSpace)
+                    let topRightOfClickedSpace = getTopRightSpace(clickedSpace)
 
                     if (
                         (isBotLeftFree(selectedPiece) || isBotRightFree(selectedPiece)) &&
@@ -563,8 +551,8 @@ function isFree(space: BoardIndex) {
 
 function isPieceMovable(space: BoardIndex) {
     if (gameTurn === GameTurn.LOCAL) {
-        var topLeft = getTopLeftSpace(space)
-        var topRight = getTopRightSpace(space)
+        let topLeft = getTopLeftSpace(space)
+        let topRight = getTopRightSpace(space)
         if (isLocalMan(space) || isLocalKing(space)) {
             // check if top right or top left are free
             if (isFree(topLeft) || isFree(topRight)) {
@@ -575,8 +563,8 @@ function isPieceMovable(space: BoardIndex) {
             }
 
             if (isLocalKing(space)) {
-                var botLeft = getBottomLeftSpace(space)
-                var botRight = getBottomRightSpace(space)
+                let botLeft = getBottomLeftSpace(space)
+                let botRight = getBottomRightSpace(space)
 
                 // check if bot right or bot left are free
                 if (isFree(botLeft) || isFree(botRight)) {
