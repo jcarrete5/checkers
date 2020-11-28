@@ -26,13 +26,13 @@ const db = new DynamoDB({
 })
 const TABLE_NAME = 'CheckersGame'
 
-/* Generates a unique game code for the game. */
+/** Generates a unique game code for the game. */
 function generateGameCode(): string {
     // TODO Generate valid random game code
     return '0001'
 }
 
-/* Validate the room code and return, otherwise throw an error */
+/** Validate the room code and return, otherwise throw an error */
 function validateGameCode(code: string | null) {
     if (!code) throw 'Room code is null'
     if (/^\d{4}$/.test(code)) {
@@ -60,9 +60,7 @@ async function publishSDPOffer(gameCode: string, offer: RTCSessionDescriptionIni
 async function waitForSDPAnswer(gameCode: string) {
     while (true) {
         const params = {
-            Key: {
-                'GameCode': { S: gameCode }
-            },
+            Key: { 'GameCode': { S: gameCode } },
             ProjectionExpression: 'Answer',
             TableName: TABLE_NAME
         } as DynamoDB.GetItemInput
@@ -82,16 +80,12 @@ async function waitForSDPAnswer(gameCode: string) {
     }
 }
 
-async function postICECandidate(gameCode: string, side: Side, candidate: string) {
+async function postICECandidate(gameCode: string, side: Side, candidate: RTCIceCandidate) {
     const params = {
-        Key: {
-            'GameCode': { N: gameCode },
-        },
-        UpdateExpression: `SET ${side} = list_append(${side}, :c)`,
-        ExpressionAttributeValues: {
-            ':c': { S: candidate }
-            // ':c': { S: JSON.stringify(candidate.toJSON()) }
-        },
+        Key: { 'GameCode': { S: gameCode } },
+        UpdateExpression: 'ADD #C :c',
+        ExpressionAttributeNames: { '#C': side },
+        ExpressionAttributeValues: { ':c': { SS: [JSON.stringify(candidate.toJSON())] } },
         TableName: TABLE_NAME
     } as DynamoDB.UpdateItemInput
     try {
@@ -101,31 +95,74 @@ async function postICECandidate(gameCode: string, side: Side, candidate: string)
     }
 }
 
-/*
+/** Yield ICE candidates from DynamoDB as they are discovered. */
+async function* collectPeerICECandidates(gameCode: string, side: Side) {
+    const yieldedCandidates = new Set<string>()
+    while (true) {
+        const params = {
+            Key: { 'GameCode': { S: gameCode } },
+            ProjectionExpression: side,
+            TableName: TABLE_NAME
+        } as DynamoDB.GetItemInput
+        try {
+            const res = await db.getItem(params).promise()
+            if (res.Item && res.Item[side].SS) {
+                for (const c of res.Item[side].SS ?? []) {
+                    if (!yieldedCandidates.has(c)) {
+                        yield JSON.parse(c) as RTCIceCandidateInit
+                        yieldedCandidates.add(c)
+                    }
+                }
+            }
+            // Limiting request rate
+            await sleep(1000)
+        } catch (err) {
+            throw err
+        }
+    }
+}
+
+/**
  * Setup event listener for ICE candidates from an ICE server and send them
  * to the other peer. Try ICE candidates from peer and return once the P2P
  * connection is established.
  */
 async function establishConnection(gameCode: string, side: Side) {
+    // Push ICE candidates to AWS when they are discovered
     peerConn.addEventListener('icecandidate', async event => {
         if (event.candidate) {
             await postICECandidate(gameCode, side, event.candidate)
+            console.log('Posted an ICE candidate', event.candidate)
         }
     })
+
+    // Add remote ICE candidates from AWS
+    const iceCandidateSeq = collectPeerICECandidates(gameCode, side)
+    async function updateICE() {
+        for await (const candidate of iceCandidateSeq) {
+            await peerConn.addIceCandidate(candidate)
+            console.log('Added ICE candidate for peer', candidate)
+        }
+    }
+    // Don't await this; We don't want to wait for completion.
+    // This gets cancelled implicitly by calling iceCandidateSeq.return()
+    // when the P2P connection is established.
+    updateICE()
+
+    // Wait for connection establishment
     const connectionEstablished = new Promise<void>((resolve, reject) => {
         peerConn.addEventListener('connectionstatechange', ev => {
             switch (peerConn.connectionState) {
                 case 'connected':
-                    console.log('P2P connection established')
+                    iceCandidateSeq.return()
                     resolve()
                     break
                 case 'failed':
+                    iceCandidateSeq.return()
                     reject()
                     break
-                default:
-                    console.log(peerConn.connectionState)
-                    break
             }
+            console.log('P2P connection state', peerConn.connectionState)
         })
     })
     await connectionEstablished
@@ -184,31 +221,11 @@ export async function joinGame(remoteGameCode: string | null) {
     // }
 }
 
-async function* collectPeerICECandidates(gameCode: string, side: Side) {
-    while (true) {
-        const params = {
-            Key: {
-                'GameCode': { S: gameCode }
-            },
-            ProjectionExpression: side,
-            TableName: TABLE_NAME
-        } as DynamoDB.GetItemInput
-        try {
-            const res = await db.getItem(params).promise()
-            if (res.Item) {
-                yield res.Item[side]
-            } else {
-                // Sleep and try again
-                await sleep(1000)
-            }
-        } catch (err) {
-            throw err
-        }
-    }
-}
-
 export async function test() {
-    const offer = await peerConn.createOffer()
-    await publishSDPOffer('0001', offer)
-
+    // const seq = collectPeerICECandidates('0001', Side.HOST)
+    // console.log(await seq.next())
+    // const offer = await peerConn.createOffer()
+    // await publishSDPOffer('0001', offer)
+    // await posticecandidate('0001', side.host, 'teststring1')
+    // await posticecandidate('0001', side.host, 'teststring2')
 }
