@@ -9,6 +9,12 @@ import Peer from 'peerjs'
 const idPrefix = 'se181-checkers'
 
 let localPeer: Peer
+const peerParams = {
+    host: 'servo.myfiosgateway.com',
+    port: 9000,
+    path: '/myapp',
+    debug: 3
+} as Peer.PeerJSOption
 
 function generateGameCode() {
     // TODO Generate sufficiently random room code
@@ -25,7 +31,7 @@ export function hostGame() {
     const gameCode = generateGameCode()
     const brokerId = `${idPrefix}_${gameCode}`
     console.log('brokerId', brokerId)
-    localPeer = new Peer(brokerId)
+    localPeer = new Peer(brokerId, peerParams)
     setupEventHandlers()
     localPeer.on('connection', conn => {
         console.log('Got a connection')
@@ -40,7 +46,7 @@ export function hostGame() {
 
 export function joinGame(gameCode: string | null) {
     if (!gameCode) throw 'Game code is null'
-    localPeer = new Peer()
+    localPeer = new Peer(peerParams)
     setupEventHandlers()
     console.log('Getting data connection')
     const brokerId = `${idPrefix}_${gameCode}`
