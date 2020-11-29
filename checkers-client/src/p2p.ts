@@ -4,46 +4,55 @@
  * Module for managing P2P communication.
  */
 
-import iceServers from "./stun";
-import { postICECandidate, Side } from "./aws";
+import Peer from 'peerjs'
 
-/* P2P channel used to communicate with other player. */
-export const peerConn = new RTCPeerConnection({ iceServers })
-let datachannel: RTCDataChannel
+const idPrefix = 'se181-checkers'
 
-peerConn.addEventListener('icegatheringstatechange', _ => {
-    console.log('Gathering state change:', peerConn.iceGatheringState)
-})
+let localPeer: Peer
 
-// Push ICE candidates to AWS when they are discovered
-peerConn.addEventListener('icecandidate', async event => {
-    console.log('icecandidate:', event)
-    if (event.candidate) {
-        // await postICECandidate(gameCode, side, event.candidate)
-        console.log('Posted an ICE candidate:', event.candidate)
-    }
-})
+function generateGameCode() {
+    // TODO Generate sufficiently random room code
+    return '0001'
+}
 
-peerConn.addEventListener('iceconnectionstatechange', async event => {
-    console.log('iceconnectionstatechange:', peerConn.iceConnectionState)
-})
+function setupEventHandlers() {
+    localPeer.on('error', err => {
+        console.error(err)
+    })
+}
 
-export function setupDataChannels(side: Side) {
-    if (side === Side.HOST) {
-        console.log('I\'m host')
-        datachannel = peerConn.createDataChannel('data')
-        datachannel.addEventListener('open', event => {
-            datachannel.send('Hello')
-            console.log('Sent data')
+export function hostGame() {
+    const gameCode = generateGameCode()
+    const brokerId = `${idPrefix}_${gameCode}`
+    console.log('brokerId', brokerId)
+    localPeer = new Peer(brokerId)
+    setupEventHandlers()
+    localPeer.on('connection', conn => {
+        console.log('Got a connection')
+        conn.on('data', data => {
+            console.log(data)
         })
-    } else {
-        console.log('I\'m peer')
-        peerConn.addEventListener('datachannel', event => {
-            console.log('Got a data channel')
-            datachannel = event.channel
-            datachannel.addEventListener('message', event => {
-                console.log(event.data)
-            })
+        conn.on('error', err => {
+            console.error(err)
         })
-    }
+    })
+}
+
+export function joinGame(gameCode: string | null) {
+    if (!gameCode) throw 'Game code is null'
+    localPeer = new Peer()
+    setupEventHandlers()
+    console.log('Getting data connection')
+    const brokerId = `${idPrefix}_${gameCode}`
+    console.log('brokerId', brokerId)
+    const dataConn = localPeer.connect(brokerId)
+    console.log('Data connection complete')
+    dataConn.on('error', err => {
+        console.error(err)
+    })
+    dataConn.on('open', () => {
+        console.log('Sending hello')
+        dataConn.send('Hello')
+        console.log('Hello sent')
+    })
 }
