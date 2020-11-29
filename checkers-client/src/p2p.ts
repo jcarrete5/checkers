@@ -10,9 +10,9 @@ const idPrefix = 'se181-checkers'
 
 let localPeer: Peer
 const peerParams = {
-    host: 'servo.myfiosgateway.com',
-    port: 9000,
-    path: '/myapp',
+    // host: 'servo.myfiosgateway.com',
+    // port: 9000,
+    // path: '/myapp',
     debug: 3
 } as Peer.PeerJSOption
 
