@@ -6,10 +6,10 @@
 
 import { CognitoIdentityCredentials } from 'aws-sdk/global'
 import DynamoDB from 'aws-sdk/clients/dynamodb'
-import { peerConn } from "./p2p";
+import { peerConn, setupDataChannels } from "./p2p";
 import { sleep } from "./util";
 
-enum Side {
+export enum Side {
     HOST = "HostICECandidates",
     PEER = "PeerICECandidates"
 }
@@ -131,6 +131,7 @@ async function establishConnection(gameCode: string, side: Side) {
     // This gets cancelled implicitly by calling iceCandidateSeq.return()
     // when the P2P connection is established.
     updateICE()
+    setupDataChannels(side)
 
     // Wait for connection establishment
     const connectionEstablished = new Promise<void>((resolve, reject) => {
@@ -159,6 +160,7 @@ export async function* createGame() {
     await publishSDPOffer(gameCode, offer)
     const answer = await waitForSDPAnswer(gameCode)
     await peerConn.setRemoteDescription(answer)
+    console.log('Before host establish connection', peerConn)
     await establishConnection(gameCode, Side.HOST)
 }
 
@@ -194,5 +196,6 @@ export async function joinGame(remoteGameCode: string | null) {
     const answer = await peerConn.createAnswer()
     await peerConn.setLocalDescription(answer)
     await publishSDPAnswer(gameCode, answer)
+    console.log('Before peer establish connection:', peerConn)
     await establishConnection(gameCode, Side.PEER)
 }
