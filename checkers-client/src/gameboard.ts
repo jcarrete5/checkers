@@ -4,16 +4,18 @@
  * Module for implementing rendering and maintaining state of the gameboard.
  */
 
+import { anyMatch } from "./util";
+
 const boardCanvas = document.getElementById('board-canvas') as HTMLCanvasElement
 
 /*************
  * CONSTANTS
  *************/
 
-const LOCAL_MAN_COLOR = '#edf285'
-const LOCAL_KING_COLOR = '#000000'
-const REMOTE_MAN_COLOR = '#fd8c04'
-const REMOTE_KING_COLOR = '#f4f4f2'
+const LOCAL_MAN_COLOR = 'black'
+const LOCAL_KING_COLOR = 'grey'
+const REMOTE_MAN_COLOR = 'red'
+const REMOTE_KING_COLOR = 'pink'
 const DARK_SPACE_COLOR = '#8db596'
 const LIGHT_SPACE_COLOR = '#bedbbb'
 const PIECE_SELECTION_BORDER_COLOR = 'red'
@@ -35,29 +37,18 @@ enum Space {
     REMOTE_KING,
 }
 
-enum GameTurn {
+enum Player {
     REMOTE,
     LOCAL,
 }
 
-/** Enumberation of values that indicate the direction to check movable spaces. */
-enum Direction {
-    TOP_LEFT,
-    TOP_RIGHT,
-    BOT_LEFT,
-    BOT_RIGHT,
-}
 /************************
  * STATE INITIALIZATION
  ************************/
 
 const O = Space.LOCAL_MAN
 const X = Space.REMOTE_MAN
-const K = Space.LOCAL_KING
-const Q = Space.REMOTE_KING
 const _ = Space.FREE
-
-let gameTurn = GameTurn.LOCAL
 
 /** Board state */
 const board = [
@@ -81,48 +72,74 @@ interface BoardIndex {
     col: number
 }
 
-let validMoves: BoardIndex[] = []
+interface Move {
+    /** Source of jump */
+    src: BoardIndex
+    /** Destination of jump */
+    dest: BoardIndex
+    /** Optional index that was jumped */
+    jumped?: BoardIndex
+}
 
-/** Current selected space on the board */
-let selectedPiece: BoardIndex | null = null
+/** List of valid moves for currently selected piece. */
+let validMoves: Set<Move> | null = null
+/** Current turn player. */
+let turnPlayer = Player.LOCAL
+/** Current selected space on the board. */
+let selectedSpace: BoardIndex | null = null
+/** True if the player can make another move. Only the piece that moved can move again */
+let goAgain: boolean = false
 
 /***************
  * FUNCTIONS
  ***************/
 
-function isLocalPiece(space: BoardIndex) {
-    return (
-        board[space.row][space.col] === Space.LOCAL_MAN ||
-        board[space.row][space.col] === Space.LOCAL_KING
-    )
+/** Set the state of a space on the board. */
+function set(i: BoardIndex, v: Space) {
+    board[i.row][i.col] = v
 }
+
+/** Get the stat of a space on the board */
+function get(i: BoardIndex) {
+    return board[i.row][i.col]
+}
+
+function isLocalPiece(space: BoardIndex) {
+    return isLocalMan(space) || isLocalKing(space)
+}
+
 function isLocalMan(space: BoardIndex) {
-    return board[space.row][space.col] === Space.LOCAL_MAN
+    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.LOCAL_MAN
 }
 
 function isLocalKing(space: BoardIndex) {
-    return board[space.row][space.col] === Space.LOCAL_KING
+    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.LOCAL_KING
 }
 
 function isRemotePiece(space: BoardIndex) {
-    return (
-        board[space.row][space.col] === Space.REMOTE_KING ||
-        board[space.row][space.col] === Space.REMOTE_MAN
-    )
+    return isRemoteMan(space) || isRemoteKing(space)
 }
 
 function isRemoteMan(space: BoardIndex) {
-    return board[space.row][space.col] === Space.REMOTE_MAN
+    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.REMOTE_MAN
 }
 
 function isRemoteKing(space: BoardIndex) {
-    return board[space.row][space.col] === Space.REMOTE_KING
+    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.REMOTE_KING
 }
 
-function drawCircle(x: number, y: number, color: string) {
+function isFree(space: BoardIndex) {
+    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.FREE
+}
+
+function isIndexEqual(i: BoardIndex, j: BoardIndex) {
+    return i.row === j.row && i.col === j.col
+}
+
+function drawCircle(x: number, y: number, r: number, color: string) {
     g.fillStyle = color
     g.beginPath()
-    g.arc(x + SIDE_LEN / 2, y + SIDE_LEN / 2, SIDE_LEN / 2, 0, Math.PI * 2, false)
+    g.arc(x + r, y + r, r, 0, Math.PI * 2, false)
     g.closePath()
     g.fill()
 }
@@ -135,6 +152,54 @@ function highlightSpace(space: BoardIndex, color: string) {
     g.stroke()
 }
 
+function getClickedSpace(e: MouseEvent) {
+    let rect = boardCanvas.getBoundingClientRect()
+    let x = e.clientX - rect.left
+    let y = e.clientY - rect.top
+    const i: BoardIndex = { row: Math.floor(y/SIDE_LEN), col: Math.floor(x/SIDE_LEN) }
+    console.log('Clicked board space', i)
+    return i
+}
+
+boardCanvas.addEventListener('click', e => {
+    const clickedSpace = getClickedSpace(e)
+    if (goAgain) {
+        if (validMoves) {
+            const move = anyMatch(validMoves, e => isIndexEqual(e.dest, clickedSpace))
+            if (move) {
+                makeMove(move)
+            }
+        }
+    } else if (isFree(clickedSpace) && selectedSpace) {
+        if (validMoves) {
+            const move = anyMatch(validMoves, e => isIndexEqual(e.dest, clickedSpace))
+            if (move) {
+                makeMove(move)
+            } else {
+                selectedSpace = null
+                validMoves = null
+            }
+        } else {
+            selectedSpace = null
+            validMoves = null
+        }
+    } else {
+        if (anyMatch(allValidMoves(turnPlayer), m => isIndexEqual(m.src, clickedSpace))) {
+            selectedSpace = clickedSpace
+            validMoves = getValidMoves(selectedSpace)
+        } else {
+            selectedSpace = null
+            validMoves = null
+        }
+    }
+    const winner = checkGameOver()
+    drawBoard()
+    if (winner) {
+        const color = winner === Player.LOCAL ? LOCAL_MAN_COLOR : REMOTE_MAN_COLOR
+        alert(`${color} has won!`)
+    }
+})
+
 export function drawBoard() {
     for (let i = 0; i < board.length; i++) {
         for (let j = 0; j < board[i].length; j++) {
@@ -145,462 +210,226 @@ export function drawBoard() {
 
             g.fillRect(x, y, SIDE_LEN, SIDE_LEN)
             if (isRemoteMan(currentSpace)) {
-                drawCircle(x, y, REMOTE_MAN_COLOR)
+                drawCircle(x, y, SIDE_LEN/2, REMOTE_MAN_COLOR)
             } else if (isRemoteKing(currentSpace)) {
-                drawCircle(x, y, REMOTE_KING_COLOR)
+                drawCircle(x, y, SIDE_LEN/2, REMOTE_KING_COLOR)
             } else if (isLocalMan(currentSpace)) {
-                drawCircle(x, y, LOCAL_MAN_COLOR)
+                drawCircle(x, y, SIDE_LEN/2, LOCAL_MAN_COLOR)
             } else if (isLocalKing(currentSpace)) {
-                drawCircle(x, y, LOCAL_KING_COLOR)
-            }
-
-            if (!selectedPiece && isPieceMovable(currentSpace)) {
-                highlightSpace(currentSpace, PIECE_SELECTION_BORDER_COLOR)
+                drawCircle(x, y, SIDE_LEN/2, LOCAL_KING_COLOR)
             }
         }
     }
 
-    if (selectedPiece) {
-        // highlight selected piece
-        highlightSpace(selectedPiece, PIECE_SELECTION_BORDER_COLOR)
+    allValidMoves(turnPlayer).forEach(m => {
+        highlightSpace(m.src, PIECE_SELECTION_BORDER_COLOR)
+    })
 
-        // highlight valid moves
-        if (isLocalMan(selectedPiece)) {
-            highlightMovesForLocalMan(selectedPiece, Direction.TOP_RIGHT, 1)
-            highlightMovesForLocalMan(selectedPiece, Direction.TOP_LEFT, 1)
-        } else if (isLocalKing(selectedPiece)) {
-            // highlight valid moves
-            highlightMovesForLocalKing(selectedPiece, Direction.TOP_RIGHT, 1)
-            highlightMovesForLocalKing(selectedPiece, Direction.TOP_LEFT, 1)
-            highlightMovesForLocalKing(selectedPiece, Direction.BOT_LEFT, 1)
-            highlightMovesForLocalKing(selectedPiece, Direction.BOT_RIGHT, 1)
-        }
+    if (selectedSpace) {
+        highlightSpace(selectedSpace, PIECE_SELECTION_BORDER_COLOR)
+        validMoves?.forEach(m => {
+            highlightSpace(m.dest, FREE_SPACE_SELECTION_BORDER_COLOR)
+        })
     }
 }
 
-function highlightMovesForLocalKing(space: BoardIndex, direction: Direction, depthLevel: number) {
-    if (isSpaceInsideBoard(space)) {
-        if (isLocalKing(space) || depthLevel > 1) {
-            //highlight top right
-            if (direction === Direction.TOP_RIGHT) {
-                let topRight = getTopRightSpace(space)
-                if (
-                    isFree(topRight) &&
-                    depthLevel === 1 &&
-                    !canCaptureBotLeftRemotePiece(space) &&
-                    !canCaptureBotRightRemotePiece(space) &&
-                    !canCaptureTopLeftRemotePiece(space)
-                ) {
-                    highlightSpace(topRight, FREE_SPACE_SELECTION_BORDER_COLOR)
-                    validMoves.push({ row: topRight.row, col: topRight.col })
-                } else if (isSpaceInsideBoard(topRight) && isRemotePiece(topRight)) {
-                    let topRightBehind = getTopRightSpace(topRight)
-                    if (isFree(topRightBehind)) {
-                        highlightSpace(topRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
-                        validMoves.push({
-                            row: topRightBehind.row,
-                            col: topRightBehind.col,
-                        })
-                    } else {
-                        return
-                    }
-                    highlightMovesForLocalKing(topRightBehind, Direction.TOP_LEFT, depthLevel + 1)
-                    highlightMovesForLocalKing(topRightBehind, Direction.TOP_RIGHT, depthLevel + 1)
-                    highlightMovesForLocalKing(topRightBehind, Direction.BOT_RIGHT, depthLevel + 1)
-                }
-            } else if (direction === Direction.TOP_LEFT) {
-                //highlight top left
-                let topLeft = getTopLeftSpace(space)
-                if (
-                    isFree(topLeft) &&
-                    depthLevel === 1 &&
-                    !canCaptureBotLeftRemotePiece(space) &&
-                    !canCaptureBotRightRemotePiece(space) &&
-                    !canCaptureTopRightRemotePiece(space)
-                ) {
-                    highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
-                    validMoves.push({ row: topLeft.row, col: topLeft.col })
-                } else if (isSpaceInsideBoard(topLeft) && isRemotePiece(topLeft)) {
-                    let topLeftBehind = getTopLeftSpace(topLeft)
-                    if (isFree(topLeftBehind)) {
-                        highlightSpace(topLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
-                        validMoves.push({ row: topLeftBehind.row, col: topLeftBehind.col })
-                    } else {
-                        return
-                    }
-                    highlightMovesForLocalKing(topLeftBehind, Direction.TOP_LEFT, depthLevel + 1)
-                    highlightMovesForLocalKing(topLeftBehind, Direction.TOP_RIGHT, depthLevel + 1)
-                    highlightMovesForLocalKing(topLeftBehind, Direction.BOT_LEFT, depthLevel + 1)
-                }
-            } else if (direction === Direction.BOT_LEFT) {
-                //highlight bot left
-                let botLeft = getBottomLeftSpace(space)
-                if (
-                    isFree(botLeft) &&
-                    depthLevel === 1 &&
-                    !canCaptureTopRightRemotePiece(space) &&
-                    !canCaptureBotRightRemotePiece(space) &&
-                    !canCaptureTopLeftRemotePiece(space)
-                ) {
-                    highlightSpace(botLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
-                    validMoves.push({ row: botLeft.row, col: botLeft.col })
-                } else if (isSpaceInsideBoard(botLeft) && isRemotePiece(botLeft)) {
-                    let botLeftBehind = getBottomLeftSpace(botLeft)
-                    if (isFree(botLeftBehind)) {
-                        highlightSpace(botLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
-                        validMoves.push({ row: botLeftBehind.row, col: botLeftBehind.col })
-                    } else {
-                        return
-                    }
-                    highlightMovesForLocalKing(botLeftBehind, Direction.TOP_LEFT, depthLevel + 1)
-                    highlightMovesForLocalKing(botLeftBehind, Direction.BOT_LEFT, depthLevel + 1)
-                    highlightMovesForLocalKing(botLeftBehind, Direction.BOT_RIGHT, depthLevel + 1)
-                }
-            } else if (direction === Direction.BOT_RIGHT) {
-                //highlight bot right
-                let botRight = getBottomRightSpace(space)
-                if (
-                    isFree(botRight) &&
-                    depthLevel === 1 &&
-                    !canCaptureBotLeftRemotePiece(space) &&
-                    !canCaptureTopRightRemotePiece(space) &&
-                    !canCaptureTopLeftRemotePiece(space)
-                ) {
-                    highlightSpace(botRight, FREE_SPACE_SELECTION_BORDER_COLOR)
-                    validMoves.push({ row: botRight.row, col: botRight.col })
-                } else if (isSpaceInsideBoard(botRight) && isRemotePiece(botRight)) {
-                    let botRightBehind = getBottomRightSpace(botRight)
-                    if (isFree(botRightBehind)) {
-                        highlightSpace(botRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
-                        validMoves.push({ row: botRightBehind.row, col: botRightBehind.col })
-                    } else {
-                        return
-                    }
-                    highlightMovesForLocalKing(botRightBehind, Direction.TOP_RIGHT, depthLevel + 1)
-                    highlightMovesForLocalKing(botRightBehind, Direction.BOT_LEFT, depthLevel + 1)
-                    highlightMovesForLocalKing(botRightBehind, Direction.BOT_RIGHT, depthLevel + 1)
-                }
+function makeMove(move: Move) {
+    if (move.jumped) {
+        set(move.jumped, Space.FREE)
+        set(move.dest, get(move.src))
+        set(move.src, Space.FREE)
+        if (tryPromoteToKing(move.dest)) {
+            swapTurns()
+            return
+        }
+        selectedSpace = move.dest
+        validMoves = getValidMoves(selectedSpace)
+        if (anyMatch(validMoves, m => !!m.jumped)) {
+            goAgain = true
+        } else {
+            swapTurns()
+        }
+    } else {
+        set(move.dest, get(move.src))
+        set(move.src, Space.FREE)
+        tryPromoteToKing(move.dest)
+        swapTurns()
+    }
+}
+
+function swapTurns() {
+    turnPlayer = (turnPlayer === Player.LOCAL ? Player.REMOTE : Player.LOCAL)
+    selectedSpace = null
+    validMoves = null
+    goAgain = false
+}
+
+function tryPromoteToKing(i: BoardIndex) {
+    if (isLocalPiece(i) && i.row === 0 && !isLocalKing(i)) {
+        set(i, Space.LOCAL_KING)
+        return true
+    } else if (isRemotePiece(i) && i.row === 7 && !isRemoteKing(i)) {
+        set(i, Space.REMOTE_KING)
+        return true
+    }
+    return false
+}
+
+function checkGameOver() {
+    let localPieceCount = 0
+    let remotePieceCount = 0
+    for (let i = 0; i < board.length; i++) {
+        for (let j = 0; j < board[0].length; j++) {
+            const s = { row: i, col: j } as BoardIndex
+            if (isLocalPiece(s)) {
+                localPieceCount++
+            } else if (isRemotePiece(s)) {
+                remotePieceCount++
             }
         }
     }
+    if (localPieceCount === 0) {
+        return Player.REMOTE
+    } else if (remotePieceCount === 0) {
+        return Player.LOCAL
+    }
 }
-//input: selected space
-function highlightMovesForLocalMan(space: BoardIndex, direction: Direction, depthLevel: number) {
-    if (isSpaceInsideBoard(space)) {
-        if (isLocalMan(space) || depthLevel > 1) {
-            //highlight topright
-            if (direction === Direction.TOP_RIGHT) {
-                let topRight = getTopRightSpace(space)
-                if (isFree(topRight) && depthLevel === 1 && !canCaptureTopLeftRemotePiece(space)) {
-                    highlightSpace(topRight, FREE_SPACE_SELECTION_BORDER_COLOR)
-                    validMoves.push({ row: topRight.row, col: topRight.col })
-                } else if (isSpaceInsideBoard(topRight) && isRemotePiece(topRight)) {
-                    let topRightBehind = getTopRightSpace(topRight)
 
-                    if (isFree(topRightBehind)) {
-                        highlightSpace(topRightBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
-                        validMoves.push({
-                            row: topRightBehind.row,
-                            col: topRightBehind.col,
-                        })
-                    } else {
-                        return
-                    }
-                    highlightMovesForLocalMan(topRightBehind, Direction.TOP_RIGHT, depthLevel + 1)
-                    highlightMovesForLocalMan(topRightBehind, Direction.TOP_LEFT, depthLevel + 1)
-                }
+function isSpaceInsideBoard(i: BoardIndex) {
+    return i.row >= 0 && i.row < 8 && i.col >= 0 && i.col < 8
+}
+
+/** Precondition: i contains a local man */
+function validMovesForLocalMan(i: BoardIndex) {
+    if (!isLocalMan(i)) throw 'Illegal state: index must contain local man'
+    const moves = new Set<Move>()
+    const left: BoardIndex = { row: i.row-1, col: i.col-1 }
+    const left2: BoardIndex = { row: i.row-2, col: i.col-2 }
+    const right: BoardIndex = { row: i.row-1, col: i.col+1 }
+    const right2: BoardIndex = { row: i.row-2, col: i.col+2 }
+    if (isFree(left)) moves.add({src: i, dest: left})
+    if (isFree(right)) moves.add({src: i, dest: right})
+    if (isRemotePiece(left) && isFree(left2)) moves.add({src: i, dest: left2, jumped: left})
+    if (isRemotePiece(right) && isFree(right2)) moves.add({src: i, dest: right2, jumped: right})
+    return moves
+}
+
+/** Precondition: i contains a local king */
+function validMovesForLocalKing(i: BoardIndex) {
+    if (!isLocalKing(i)) throw 'Illegal state: index must contain local king'
+    const moves = new Set<Move>()
+    const topleft: BoardIndex = { row: i.row-1, col: i.col-1 }
+    const topleft2: BoardIndex = { row: i.row-2, col: i.col-2 }
+    const topright: BoardIndex = { row: i.row-1, col: i.col+1 }
+    const topright2: BoardIndex = { row: i.row-2, col: i.col+2 }
+    const bottomleft: BoardIndex = { row: i.row+1, col: i.col-1 }
+    const bottomleft2: BoardIndex = { row: i.row+2, col: i.col-2 }
+    const bottomright: BoardIndex = { row: i.row+1, col: i.col+1 }
+    const bottomright2: BoardIndex = { row: i.row+2, col: i.col+2 }
+    if (isFree(topleft)) moves.add({src: i, dest: topleft})
+    if (isFree(topright)) moves.add({src: i, dest: topright})
+    if (isFree(bottomleft)) moves.add({src: i, dest: bottomleft})
+    if (isFree(bottomright)) moves.add({src: i, dest: bottomright})
+    if (isRemotePiece(topleft) && isFree(topleft2)) moves.add({src: i, dest: topleft2, jumped: topleft})
+    if (isRemotePiece(topright) && isFree(topright2)) moves.add({src: i, dest: topright2, jumped: topright})
+    if (isRemotePiece(bottomleft) && isFree(bottomleft2)) moves.add({src: i, dest: bottomleft2, jumped: bottomleft})
+    if (isRemotePiece(bottomright) && isFree(bottomright2)) moves.add({src: i, dest: bottomright2, jumped: bottomright})
+    return moves
+}
+
+/** Precondition: i contains a remote man */
+function validMovesForRemoteMan(i: BoardIndex) {
+    if (!isRemoteMan(i)) throw 'Illegal state: index must contain remote man'
+    const moves = new Set<Move>()
+    const left: BoardIndex = { row: i.row+1, col: i.col-1 }
+    const left2: BoardIndex = { row: i.row+2, col: i.col-2 }
+    const right: BoardIndex = { row: i.row+1, col: i.col+1 }
+    const right2: BoardIndex = { row: i.row+2, col: i.col+2 }
+    if (isFree(left)) moves.add({src: i, dest: left})
+    if (isFree(right)) moves.add({src: i, dest: right})
+    if (isLocalPiece(left) && isFree(left2)) moves.add({src: i, dest: left2, jumped: left})
+    if (isLocalPiece(right) && isFree(right2)) moves.add({src: i, dest: right2, jumped: right})
+    return moves
+}
+
+/** Precondition: i contains a remote king */
+function validMovesForRemoteKing(i: BoardIndex) {
+    if (!isRemoteKing(i)) throw 'Illegal state: index must contain remote king'
+    const moves = new Set<Move>()
+    const topleft: BoardIndex = { row: i.row-1, col: i.col-1 }
+    const topleft2: BoardIndex = { row: i.row-2, col: i.col-2 }
+    const topright: BoardIndex = { row: i.row-1, col: i.col+1 }
+    const topright2: BoardIndex = { row: i.row-2, col: i.col+2 }
+    const bottomleft: BoardIndex = { row: i.row+1, col: i.col-1 }
+    const bottomleft2: BoardIndex = { row: i.row+2, col: i.col-2 }
+    const bottomright: BoardIndex = { row: i.row+1, col: i.col+1 }
+    const bottomright2: BoardIndex = { row: i.row+2, col: i.col+2 }
+    if (isFree(topleft)) moves.add({src: i, dest: topleft})
+    if (isFree(topright)) moves.add({src: i, dest: topright})
+    if (isFree(bottomleft)) moves.add({src: i, dest: bottomleft})
+    if (isFree(bottomright)) moves.add({src: i, dest: bottomright})
+    if (isLocalPiece(topleft) && isFree(topleft2)) moves.add({src: i, dest: topleft2, jumped: topleft})
+    if (isLocalPiece(topright) && isFree(topright2)) moves.add({src: i, dest: topright2, jumped: topright})
+    if (isLocalPiece(bottomleft) && isFree(bottomleft2)) moves.add({src: i, dest: bottomleft2, jumped: bottomleft})
+    if (isLocalPiece(bottomright) && isFree(bottomright2)) moves.add({src: i, dest: bottomright2, jumped: bottomright})
+    return moves
+}
+
+function getValidMoves(i: BoardIndex) {
+    if (!isSpaceInsideBoard(i)) throw 'Index out of bounds'
+    let moves: Set<Move>
+    switch (board[i.row][i.col]) {
+        case Space.LOCAL_MAN:
+            moves = validMovesForLocalMan(i)
+            break;
+        case Space.LOCAL_KING:
+            moves = validMovesForLocalKing(i)
+            break;
+        case Space.REMOTE_MAN:
+            moves = validMovesForRemoteMan(i)
+            break;
+        case Space.REMOTE_KING:
+            moves = validMovesForRemoteKing(i)
+            break;
+        default:
+            return new Set<Move>()  // No valid moves for an empty space
+    }
+    // If a piece has jump moves, then those are the only valid moves
+    const jumpMoves = new Set<Move>()
+    moves.forEach(m => {
+        if (m.jumped) {
+            jumpMoves.add(m)
+        }
+    })
+    return jumpMoves.size > 0 ? jumpMoves : moves
+}
+
+/** Return a Set of all valid moves for player. */
+function allValidMoves(p: Player) {
+    const allValidMoveSets = new Set<Set<Move>>()
+    for (let i = 0; i < board.length; i++) {
+        for (let j = 0; j < board[0].length; j++) {
+            const s = { row: i, col: j } as BoardIndex
+            if (p === Player.LOCAL && isLocalPiece(s) || p === Player.REMOTE && isRemotePiece(s)) {
+                allValidMoveSets.add(getValidMoves(s))
+            }
+        }
+    }
+    const allJumpMoves = new Set<Move>()
+    const allNonJumpMoves = new Set<Move>()
+    allValidMoveSets.forEach(moveSet => {
+        moveSet.forEach(move => {
+            if (move.jumped) {
+                allJumpMoves.add(move)
             } else {
-                //highlight topleft
-                let topLeft = getTopLeftSpace(space)
-                if (isFree(topLeft) && depthLevel === 1 && !canCaptureTopRightRemotePiece(space)) {
-                    highlightSpace(topLeft, FREE_SPACE_SELECTION_BORDER_COLOR)
-                    validMoves.push({ row: topLeft.row, col: topLeft.col })
-                } else if (isSpaceInsideBoard(topLeft) && isRemotePiece(topLeft)) {
-                    let topLeftBehind = getTopLeftSpace(topLeft)
-                    if (isFree(topLeftBehind)) {
-                        highlightSpace(topLeftBehind, FREE_SPACE_SELECTION_BORDER_COLOR)
-                        validMoves.push({ row: topLeftBehind.row, col: topLeftBehind.col })
-                    } else {
-                        return
-                    }
-                    highlightMovesForLocalMan(topLeftBehind, Direction.TOP_LEFT, depthLevel + 1)
-                    highlightMovesForLocalMan(topLeftBehind, Direction.TOP_RIGHT, depthLevel + 1)
-                }
+                allNonJumpMoves.add(move)
             }
-        }
+        })
+    })
+    // If there are jump moves, those are the only valid moves
+    if (allJumpMoves.size > 0) {
+        return allJumpMoves
+    } else {
+        return allNonJumpMoves
     }
-}
-
-function canCaptureTopLeftRemotePiece(space: BoardIndex) {
-    if (isLocalPiece(space)) {
-        let topLeft = getTopLeftSpace(space)
-        if (isSpaceInsideBoard(topLeft) && isRemotePiece(topLeft)) {
-            let topLeftBehind = getTopLeftSpace(topLeft)
-            if (isFree(topLeftBehind)) {
-                return true
-            }
-        }
-    }
-    return false
-}
-
-function canCaptureTopRightRemotePiece(space: BoardIndex) {
-    if (isLocalPiece(space)) {
-        let topRight = getTopRightSpace(space)
-        if (isSpaceInsideBoard(topRight) && isRemotePiece(topRight)) {
-            let topRightBehind = getTopRightSpace(topRight)
-            if (isFree(topRightBehind)) {
-                return true
-            }
-        }
-    }
-
-    return false
-}
-
-function canCaptureBotRightRemotePiece(space: BoardIndex) {
-    if (isLocalPiece(space)) {
-        if (isLocalMan(space)) {
-            return false
-        }
-        let botRight = getBottomRightSpace(space)
-        if (isSpaceInsideBoard(botRight) && isRemotePiece(botRight)) {
-            let botRightBehind = getBottomRightSpace(botRight)
-            if (isFree(botRightBehind)) {
-                return true
-            }
-        }
-    }
-
-    return false
-}
-
-function canCaptureBotLeftRemotePiece(space: BoardIndex) {
-    if (isLocalPiece(space)) {
-        if (isLocalMan(space)) {
-            return false
-        }
-        let botLeft = getBottomLeftSpace(space)
-        if (isSpaceInsideBoard(botLeft) && isRemotePiece(botLeft)) {
-            let botLeftBehind = getBottomLeftSpace(botLeft)
-            if (isFree(botLeftBehind)) {
-                return true
-            }
-        }
-    }
-
-    return false
-}
-
-function canCaptureRemotePiece(space: BoardIndex) {
-    return (
-        canCaptureBotLeftRemotePiece(space) ||
-        canCaptureBotRightRemotePiece(space) ||
-        canCaptureTopLeftRemotePiece(space) ||
-        canCaptureTopRightRemotePiece(space)
-    )
-}
-
-function getMousePosition(canvas: HTMLCanvasElement, event: MouseEvent) {
-    let rect = canvas.getBoundingClientRect()
-    let x = event.clientX - rect.left
-    let y = event.clientY - rect.top
-    return { x, y }
-}
-
-function getClickedSquare(x: number, y: number) {
-    var row: number = 0
-    var col: number = 0
-    row = Math.floor(y / SIDE_LEN)
-    col = Math.floor(x / SIDE_LEN)
-    console.log(`row: ${row}, col: ${col}`)
-
-    return { row, col }
-}
-
-function areEqualSpaces(space1: BoardIndex, space2: BoardIndex) {
-    return space1.row === space2.row && space1.col === space2.col
-}
-
-function isTopLeftFree(space: BoardIndex) {
-    var topLeft = getTopLeftSpace(space)
-    return isFree(topLeft)
-}
-
-function isTopRightFree(space: BoardIndex) {
-    var topRight = getTopRightSpace(space)
-    return isFree(topRight)
-}
-
-function isBotLeftFree(space: BoardIndex) {
-    var botLeft = getBottomLeftSpace(space)
-    return isFree(botLeft)
-}
-
-function isBotRightFree(space: BoardIndex) {
-    var botLeft = getBottomRightSpace(space)
-    return isFree(botLeft)
-}
-
-function movePiece(from: BoardIndex, to: BoardIndex, middle: BoardIndex | null) {
-    board[to.row][to.col] = isLocalMan(from) ? Space.LOCAL_MAN : Space.LOCAL_KING
-    board[from.row][from.col] = Space.FREE
-    if (middle) {
-        board[middle.row][middle.col] = Space.FREE
-    }
-
-    selectedPiece = to
-    // transform to king
-    if (to.row === 0 && isLocalMan(selectedPiece)) {
-        board[to.row][to.col] = Space.LOCAL_KING
-    }
-}
-
-function changeGameTurnToRemote() {
-    // unselect the piece
-    selectedPiece = null
-    // change game turn to remote
-    gameTurn = GameTurn.REMOTE
-}
-
-boardCanvas.addEventListener('click', (e) => {
-    var { x, y } = getMousePosition(boardCanvas, e)
-    var clickedSpace = getClickedSquare(x, y)
-    if (isLocalPiece(clickedSpace) && isPieceMovable(clickedSpace)) {
-        selectedPiece = clickedSpace
-        validMoves = []
-    }
-
-    if (
-        isFree(clickedSpace) &&
-        validMoves.findIndex(
-            (space) => space.col === clickedSpace.col && space.row === clickedSpace.row
-        ) != -1
-    ) {
-        if (selectedPiece) {
-            let bottomLeftOfClickedSpace = getBottomLeftSpace(clickedSpace)
-            let topRightOfSelectedSpace = getTopRightSpace(selectedPiece)
-
-            let bottomRightOfClickedSpace = getBottomRightSpace(clickedSpace)
-            let topLeftOfSelectedSpace = getTopLeftSpace(selectedPiece)
-
-            if (
-                (isTopLeftFree(selectedPiece) || isTopRightFree(selectedPiece)) &&
-                (areEqualSpaces(clickedSpace, topRightOfSelectedSpace) ||
-                    areEqualSpaces(clickedSpace, topLeftOfSelectedSpace))
-            ) {
-                // move selected piece to a free space
-                movePiece(selectedPiece, clickedSpace, null)
-                // change game turn to remote
-                changeGameTurnToRemote()
-            } else if (areEqualSpaces(bottomLeftOfClickedSpace, topRightOfSelectedSpace)) {
-                // capture top right piece of selected piece
-                movePiece(selectedPiece, clickedSpace, bottomLeftOfClickedSpace)
-            } else if (areEqualSpaces(bottomRightOfClickedSpace, topLeftOfSelectedSpace)) {
-                // capture top left piece of selected piece
-                movePiece(selectedPiece, clickedSpace, bottomRightOfClickedSpace)
-            } else {
-                if (isLocalKing(selectedPiece)) {
-                    let botLeftOfSelectedSpace = getBottomLeftSpace(selectedPiece)
-                    let botRightOfSelectedSpace = getBottomRightSpace(selectedPiece)
-
-                    let topLeftOfClickedSpace = getTopLeftSpace(clickedSpace)
-                    let topRightOfClickedSpace = getTopRightSpace(clickedSpace)
-
-                    if (
-                        (isBotLeftFree(selectedPiece) || isBotRightFree(selectedPiece)) &&
-                        (areEqualSpaces(clickedSpace, botLeftOfSelectedSpace) ||
-                            areEqualSpaces(clickedSpace, botRightOfSelectedSpace))
-                    ) {
-                        // move selected piece to a free space
-                        movePiece(selectedPiece, clickedSpace, null)
-                        // change game turn to remote
-                        changeGameTurnToRemote()
-                    } else if (areEqualSpaces(botLeftOfSelectedSpace, topRightOfClickedSpace)) {
-                        // capture top right piece of selected piece
-                        movePiece(selectedPiece, clickedSpace, topRightOfClickedSpace)
-                    } else if (areEqualSpaces(botRightOfSelectedSpace, topLeftOfClickedSpace)) {
-                        // capture top left piece of selected piece
-                        movePiece(selectedPiece, clickedSpace, topLeftOfClickedSpace)
-                    }
-                }
-            }
-
-            if (selectedPiece && !canCaptureRemotePiece(selectedPiece)) {
-                changeGameTurnToRemote()
-            }
-        }
-    }
-
-    drawBoard()
-})
-
-function getBottomLeftSpace(space: BoardIndex) {
-    if (isSpaceInsideBoard(space)) {
-        return { row: space.row + 1, col: space.col - 1 }
-    }
-    return { row: -1, col: -1 }
-}
-
-function getBottomRightSpace(space: BoardIndex) {
-    if (isSpaceInsideBoard(space)) {
-        return { row: space.row + 1, col: space.col + 1 }
-    }
-    return { row: -1, col: -1 }
-}
-
-function isSpaceInsideBoard(space: BoardIndex) {
-    if (space.row > 7 || space.row < 0 || space.col > 7 || space.col < 0) {
-        return false
-    }
-    return true
-}
-
-function getTopLeftSpace(space: BoardIndex) {
-    if (isSpaceInsideBoard(space)) {
-        return { row: space.row - 1, col: space.col - 1 }
-    }
-    return { row: -1, col: -1 }
-}
-
-function getTopRightSpace(space: BoardIndex) {
-    if (isSpaceInsideBoard(space)) {
-        return { row: space.row - 1, col: space.col + 1 }
-    }
-    return { row: -1, col: -1 }
-}
-
-function isFree(space: BoardIndex) {
-    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.FREE
-}
-
-function isPieceMovable(space: BoardIndex) {
-    if (gameTurn === GameTurn.LOCAL) {
-        let topLeft = getTopLeftSpace(space)
-        let topRight = getTopRightSpace(space)
-        if (isLocalMan(space) || isLocalKing(space)) {
-            // check if top right or top left are free
-            if (isFree(topLeft) || isFree(topRight)) {
-                return true
-            }
-            if (canCaptureTopLeftRemotePiece(space) || canCaptureTopRightRemotePiece(space)) {
-                return true
-            }
-
-            if (isLocalKing(space)) {
-                let botLeft = getBottomLeftSpace(space)
-                let botRight = getBottomRightSpace(space)
-
-                // check if bot right or bot left are free
-                if (isFree(botLeft) || isFree(botRight)) {
-                    return true
-                }
-                if (canCaptureBotLeftRemotePiece(space) || canCaptureBotRightRemotePiece(space)) {
-                    return true
-                }
-            }
-        }
-    }
-
-    return false
 }
