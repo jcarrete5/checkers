@@ -26,6 +26,7 @@
     "prettier": "^2.1.2",
     "prettifier": "^0.4.0",
     "ts-loader": "^8.0.5",
+    "tslint": "^6.1.3",
     "typescript": "^4.0.3",
     "webpack": "^5.1.3",
     "webpack-cli": "^4.1.0",
