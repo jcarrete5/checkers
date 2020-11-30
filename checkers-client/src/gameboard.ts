@@ -63,10 +63,10 @@ let gameTurn = GameTurn.LOCAL
 const board = [
     [_, X, _, X, _, X, _, X],
     [X, _, X, _, X, _, X, _],
-    [_, X, _, X, _, X, _, X],
+    [_, X, _, X, _, _, _, X],
+    [_, _, _, _, X, _, _, _],
     [_, _, _, _, _, _, _, _],
-    [_, _, _, _, _, _, _, _],
-    [O, _, O, _, O, _, O, _],
+    [_, _, X, _, O, _, O, _],
     [_, O, _, O, _, O, _, O],
     [O, _, O, _, O, _, O, _],
 ]
@@ -392,6 +392,15 @@ function canCaptureBotLeftRemotePiece(space: BoardIndex) {
     return false
 }
 
+function canCaptureRemotePiece(space: BoardIndex) {
+    return (
+        canCaptureBotLeftRemotePiece(space) ||
+        canCaptureBotRightRemotePiece(space) ||
+        canCaptureTopLeftRemotePiece(space) ||
+        canCaptureTopRightRemotePiece(space)
+    )
+}
+
 function getMousePosition(canvas: HTMLCanvasElement, event: MouseEvent) {
     let rect = canvas.getBoundingClientRect()
     let x = event.clientX - rect.left
@@ -447,6 +456,13 @@ function movePiece(from: BoardIndex, to: BoardIndex, middle: BoardIndex | null) 
     }
 }
 
+function changeGameTurnToRemote() {
+    // unselect the piece
+    selectedPiece = null
+    // change game turn to remote
+    gameTurn = GameTurn.REMOTE
+}
+
 boardCanvas.addEventListener('click', (e) => {
     var { x, y } = getMousePosition(boardCanvas, e)
     var clickedSpace = getClickedSquare(x, y)
@@ -475,6 +491,8 @@ boardCanvas.addEventListener('click', (e) => {
             ) {
                 // move selected piece to a free space
                 movePiece(selectedPiece, clickedSpace, null)
+                // change game turn to remote
+                changeGameTurnToRemote()
             } else if (areEqualSpaces(bottomLeftOfClickedSpace, topRightOfSelectedSpace)) {
                 // capture top right piece of selected piece
                 movePiece(selectedPiece, clickedSpace, bottomLeftOfClickedSpace)
@@ -494,7 +512,10 @@ boardCanvas.addEventListener('click', (e) => {
                         (areEqualSpaces(clickedSpace, botLeftOfSelectedSpace) ||
                             areEqualSpaces(clickedSpace, botRightOfSelectedSpace))
                     ) {
+                        // move selected piece to a free space
                         movePiece(selectedPiece, clickedSpace, null)
+                        // change game turn to remote
+                        changeGameTurnToRemote()
                     } else if (areEqualSpaces(botLeftOfSelectedSpace, topRightOfClickedSpace)) {
                         // capture top right piece of selected piece
                         movePiece(selectedPiece, clickedSpace, topRightOfClickedSpace)
@@ -503,6 +524,10 @@ boardCanvas.addEventListener('click', (e) => {
                         movePiece(selectedPiece, clickedSpace, topLeftOfClickedSpace)
                     }
                 }
+            }
+
+            if (selectedPiece && !canCaptureRemotePiece(selectedPiece)) {
+                changeGameTurnToRemote()
             }
         }
     }
