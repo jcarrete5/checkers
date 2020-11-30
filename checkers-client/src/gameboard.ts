@@ -21,10 +21,10 @@ const LIGHT_SPACE_COLOR = '#bedbbb'
 const PIECE_SELECTION_BORDER_COLOR = 'red'
 const FREE_SPACE_SELECTION_BORDER_COLOR = 'blue'
 const SELECTION_BORDER_WIDTH = 2
-const SIDE_LEN = boardCanvas.width / 8
+const SIDE_LEN = 75//boardCanvas.width / 8
 
 /** Enumeration of values that can occupy a space on the board. */
-enum Space {
+export enum Space {
     /** A free space */
     FREE,
     /** Local player's man */
@@ -37,7 +37,7 @@ enum Space {
     REMOTE_KING,
 }
 
-enum Player {
+export enum Player {
     REMOTE = 1,
     LOCAL,
 }
@@ -46,9 +46,9 @@ enum Player {
  * STATE INITIALIZATION
  ************************/
 
-const O = Space.LOCAL_MAN
-const X = Space.REMOTE_MAN
-const _ = Space.FREE
+export const O = Space.LOCAL_MAN
+export const X = Space.REMOTE_MAN
+export const _ = Space.FREE
 
 /** Board state */
 const board = [
@@ -67,12 +67,12 @@ const _g = boardCanvas.getContext('2d')
 if (!_g) throw new Error('Failed to load graphics 2D context for board canvas')
 const g = _g
 
-interface BoardIndex {
+export interface BoardIndex {
     row: number
     col: number
 }
 
-interface Move {
+export interface Move {
     /** Source of jump */
     src: BoardIndex
     /** Destination of jump */
