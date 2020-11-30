@@ -21,7 +21,7 @@ const LIGHT_SPACE_COLOR = '#bedbbb'
 const PIECE_SELECTION_BORDER_COLOR = 'red'
 const FREE_SPACE_SELECTION_BORDER_COLOR = 'blue'
 const SELECTION_BORDER_WIDTH = 2
-const SIDE_LEN = 75//boardCanvas.width / 8
+const SIDE_LEN = boardCanvas.width / 8
 
 /** Enumeration of values that can occupy a space on the board. */
 export enum Space {
