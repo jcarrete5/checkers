@@ -38,7 +38,7 @@ enum Space {
 }
 
 enum Player {
-    REMOTE,
+    REMOTE = 1,
     LOCAL,
 }
 
@@ -288,9 +288,9 @@ function checkGameOver() {
             }
         }
     }
-    if (localPieceCount === 0) {
+    if (localPieceCount === 0 || allValidMoves(Player.LOCAL).size === 0) {
         return Player.REMOTE
-    } else if (remotePieceCount === 0) {
+    } else if (remotePieceCount === 0 || allValidMoves(Player.REMOTE).size === 0) {
         return Player.LOCAL
     }
 }
