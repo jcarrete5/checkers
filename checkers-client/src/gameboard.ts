@@ -404,10 +404,6 @@ function getValidMoves(i: BoardIndex) {
     return jumpMoves.size > 0 ? jumpMoves : moves
 }
 
-function isPieceMovable(i: BoardIndex, player: Player) {
-    return getValidMoves(i).size > 0 && (isLocalPiece(i) && player === Player.LOCAL || isRemotePiece(i) && player === Player.REMOTE)
-}
-
 /** Return a Set of all valid moves for player. */
 function allValidMoves(p: Player) {
     const allValidMoveSets = new Set<Set<Move>>()
@@ -436,9 +432,4 @@ function allValidMoves(p: Player) {
     } else {
         return allNonJumpMoves
     }
-}
-
-/** Return true if there are any jump moves available for the player. */
-function anyJumpMoves(p: Player) {
-    return false
 }
