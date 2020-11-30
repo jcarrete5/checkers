@@ -24,7 +24,7 @@ const SELECTION_BORDER_WIDTH = 2
 const SIDE_LEN = boardCanvas.width / 8
 
 /** Enumeration of values that can occupy a space on the board. */
-enum Space {
+export enum Space {
     /** A free space */
     FREE,
     /** Local player's man */
@@ -37,7 +37,7 @@ enum Space {
     REMOTE_KING,
 }
 
-enum Player {
+export enum Player {
     REMOTE = 1,
     LOCAL,
 }
@@ -46,9 +46,9 @@ enum Player {
  * STATE INITIALIZATION
  ************************/
 
-const O = Space.LOCAL_MAN
-const X = Space.REMOTE_MAN
-const _ = Space.FREE
+export const O = Space.LOCAL_MAN
+export const X = Space.REMOTE_MAN
+export const _ = Space.FREE
 
 /** Board state */
 const board = [
@@ -64,15 +64,15 @@ const board = [
 
 /** Graphics context */
 const _g = boardCanvas.getContext('2d')
-if (!_g) throw 'Failed to load graphics 2D context for board canvas'
+if (!_g) throw new Error('Failed to load graphics 2D context for board canvas')
 const g = _g
 
-interface BoardIndex {
+export interface BoardIndex {
     row: number
     col: number
 }
 
-interface Move {
+export interface Move {
     /** Source of jump */
     src: BoardIndex
     /** Destination of jump */
@@ -153,16 +153,16 @@ function highlightSpace(space: BoardIndex, color: string) {
 }
 
 function getClickedSpace(e: MouseEvent) {
-    let rect = boardCanvas.getBoundingClientRect()
-    let x = e.clientX - rect.left
-    let y = e.clientY - rect.top
+    const rect = boardCanvas.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
     const i: BoardIndex = { row: Math.floor(y/SIDE_LEN), col: Math.floor(x/SIDE_LEN) }
     console.log('Clicked board space', i)
     return i
 }
 
-boardCanvas.addEventListener('click', e => {
-    const clickedSpace = getClickedSpace(e)
+boardCanvas.addEventListener('click', event => {
+    const clickedSpace = getClickedSpace(event)
     if (goAgain) {
         if (validMoves) {
             const move = anyMatch(validMoves, e => isIndexEqual(e.dest, clickedSpace))
@@ -203,7 +203,7 @@ boardCanvas.addEventListener('click', e => {
 export function drawBoard() {
     for (let i = 0; i < board.length; i++) {
         for (let j = 0; j < board[i].length; j++) {
-            let currentSpace = { row: i, col: j }
+            const currentSpace = { row: i, col: j }
             g.fillStyle = (i + j) % 2 ? DARK_SPACE_COLOR : LIGHT_SPACE_COLOR
             const x = j * SIDE_LEN
             const y = i * SIDE_LEN
@@ -301,7 +301,7 @@ function isSpaceInsideBoard(i: BoardIndex) {
 
 /** Precondition: i contains a local man */
 function validMovesForLocalMan(i: BoardIndex) {
-    if (!isLocalMan(i)) throw 'Illegal state: index must contain local man'
+    if (!isLocalMan(i)) throw new Error('Illegal state: index must contain local man')
     const moves = new Set<Move>()
     const left: BoardIndex = { row: i.row-1, col: i.col-1 }
     const left2: BoardIndex = { row: i.row-2, col: i.col-2 }
@@ -316,7 +316,7 @@ function validMovesForLocalMan(i: BoardIndex) {
 
 /** Precondition: i contains a local king */
 function validMovesForLocalKing(i: BoardIndex) {
-    if (!isLocalKing(i)) throw 'Illegal state: index must contain local king'
+    if (!isLocalKing(i)) throw new Error('Illegal state: index must contain local king')
     const moves = new Set<Move>()
     const topleft: BoardIndex = { row: i.row-1, col: i.col-1 }
     const topleft2: BoardIndex = { row: i.row-2, col: i.col-2 }
@@ -339,7 +339,7 @@ function validMovesForLocalKing(i: BoardIndex) {
 
 /** Precondition: i contains a remote man */
 function validMovesForRemoteMan(i: BoardIndex) {
-    if (!isRemoteMan(i)) throw 'Illegal state: index must contain remote man'
+    if (!isRemoteMan(i)) throw new Error('Illegal state: index must contain remote man')
     const moves = new Set<Move>()
     const left: BoardIndex = { row: i.row+1, col: i.col-1 }
     const left2: BoardIndex = { row: i.row+2, col: i.col-2 }
@@ -354,7 +354,7 @@ function validMovesForRemoteMan(i: BoardIndex) {
 
 /** Precondition: i contains a remote king */
 function validMovesForRemoteKing(i: BoardIndex) {
-    if (!isRemoteKing(i)) throw 'Illegal state: index must contain remote king'
+    if (!isRemoteKing(i)) throw new Error('Illegal state: index must contain remote king')
     const moves = new Set<Move>()
     const topleft: BoardIndex = { row: i.row-1, col: i.col-1 }
     const topleft2: BoardIndex = { row: i.row-2, col: i.col-2 }
@@ -376,7 +376,7 @@ function validMovesForRemoteKing(i: BoardIndex) {
 }
 
 function getValidMoves(i: BoardIndex) {
-    if (!isSpaceInsideBoard(i)) throw 'Index out of bounds'
+    if (!isSpaceInsideBoard(i)) throw new Error('Index out of bounds')
     let moves: Set<Move>
     switch (board[i.row][i.col]) {
         case Space.LOCAL_MAN:
@@ -405,7 +405,7 @@ function getValidMoves(i: BoardIndex) {
 }
 
 /** Return a Set of all valid moves for player. */
-function allValidMoves(p: Player) {
+export function allValidMoves(p: Player) {
     const allValidMoveSets = new Set<Set<Move>>()
     for (let i = 0; i < board.length; i++) {
         for (let j = 0; j < board[0].length; j++) {

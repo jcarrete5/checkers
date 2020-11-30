@@ -24,7 +24,6 @@ function setupEventHandlers() {
 export function hostGame() {
     const gameCode = generateGameCode()
     const brokerId = `${idPrefix}_${gameCode}`
-    console.log('brokerId', brokerId)
     localPeer = new Peer(brokerId)
     setupEventHandlers()
     localPeer.on('connection', conn => {
@@ -39,20 +38,15 @@ export function hostGame() {
 }
 
 export function joinGame(gameCode: string | null) {
-    if (!gameCode) throw 'Game code is null'
+    if (!gameCode) throw new Error('Game code is null')
     localPeer = new Peer()
     setupEventHandlers()
-    console.log('Getting data connection')
     const brokerId = `${idPrefix}_${gameCode}`
-    console.log('brokerId', brokerId)
     const dataConn = localPeer.connect(brokerId)
-    console.log('Data connection complete')
     dataConn.on('error', err => {
         console.error(err)
     })
     dataConn.on('open', () => {
-        console.log('Sending hello')
         dataConn.send('Hello')
-        console.log('Hello sent')
     })
 }
