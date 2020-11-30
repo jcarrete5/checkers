@@ -192,7 +192,12 @@ boardCanvas.addEventListener('click', e => {
             validMoves = null
         }
     }
+    const winner = checkGameOver()
     drawBoard()
+    if (winner) {
+        const color = winner === Player.LOCAL ? LOCAL_MAN_COLOR : REMOTE_MAN_COLOR
+        alert(`${color} has won!`)
+    }
 })
 
 export function drawBoard() {
@@ -268,6 +273,26 @@ function tryPromoteToKing(i: BoardIndex) {
         return true
     }
     return false
+}
+
+function checkGameOver() {
+    let localPieceCount = 0
+    let remotePieceCount = 0
+    for (let i = 0; i < board.length; i++) {
+        for (let j = 0; j < board[0].length; j++) {
+            const s = { row: i, col: j } as BoardIndex
+            if (isLocalPiece(s)) {
+                localPieceCount++
+            } else if (isRemotePiece(s)) {
+                remotePieceCount++
+            }
+        }
+    }
+    if (localPieceCount === 0) {
+        return Player.REMOTE
+    } else if (remotePieceCount === 0) {
+        return Player.LOCAL
+    }
 }
 
 function isSpaceInsideBoard(i: BoardIndex) {
