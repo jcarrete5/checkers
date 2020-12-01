@@ -6,47 +6,55 @@
 
 import Peer from 'peerjs'
 
-const idPrefix = 'se181-checkers'
-
-let localPeer: Peer
-
-function generateGameCode() {
-    // TODO Generate sufficiently random room code
-    return '0001'
+enum MessageType {
+    MOVE,
+    END_TURN
 }
 
-function setupEventHandlers() {
-    localPeer.on('error', err => {
+interface PDU {
+    type: MessageType
+    payload: any
+}
+
+const localPeer = new Peer()
+
+/** Get the broker ID for the local Peer connection. */
+async function getBrokerId() {
+    const id = new Promise<string>((resolve, reject) => {
+        if (localPeer.id) {
+            resolve(localPeer.id)
+        } else {
+            localPeer.on('open', id => {
+                resolve(id)
+            })
+            localPeer.on('error', err => {
+                reject(err)
+            })
+        }
+    })
+    return await id
+}
+
+function addDataConnectionHandlers(conn: Peer.DataConnection) {
+    conn.on('error', err => {
         console.error(err)
+        conn.close()
+    })
+    conn.on('data', (data: PDU) => {
+        // TODO process PDU i.e. update game state
     })
 }
 
-export function hostGame() {
-    const gameCode = generateGameCode()
-    const brokerId = `${idPrefix}_${gameCode}`
-    localPeer = new Peer(brokerId)
-    setupEventHandlers()
+export async function hostGame() {
+    const id = await getBrokerId()
+    alert(`Game code: ${id}`)
     localPeer.on('connection', conn => {
-        console.log('Got a connection')
-        conn.on('data', data => {
-            console.log(data)
-        })
-        conn.on('error', err => {
-            console.error(err)
-        })
+        addDataConnectionHandlers(conn)
     })
 }
 
 export function joinGame(gameCode: string | null) {
     if (!gameCode) throw new Error('Game code is null')
-    localPeer = new Peer()
-    setupEventHandlers()
-    const brokerId = `${idPrefix}_${gameCode}`
-    const dataConn = localPeer.connect(brokerId)
-    dataConn.on('error', err => {
-        console.error(err)
-    })
-    dataConn.on('open', () => {
-        dataConn.send('Hello')
-    })
+    const conn = localPeer.connect(gameCode)
+    addDataConnectionHandlers(conn)
 }
