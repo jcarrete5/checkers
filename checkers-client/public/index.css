@@ -1,0 +1,20 @@
+#board-canvas {
+    border: solid black 2px
+}
+
+.page-wrapper {
+    display: flex;
+    margin: auto;
+    width: max-content;
+    height: max-content;
+}
+
+.column {
+    display: flex;
+    flex-direction: column;
+    margin: 0 20px;
+}
+
+.column-item {
+    margin: 0.5em 0;
+}
