@@ -5,6 +5,7 @@
  */
 
 import { anyMatch } from "./util";
+import { sendMove, sendEndTurn } from "./p2p";
 
 const boardCanvas = document.getElementById('board-canvas') as HTMLCanvasElement
 
@@ -20,7 +21,6 @@ const DARK_SPACE_COLOR = '#8db596'
 const LIGHT_SPACE_COLOR = '#bedbbb'
 const PIECE_SELECTION_BORDER_COLOR = 'red'
 const FREE_SPACE_SELECTION_BORDER_COLOR = 'blue'
-const SELECTION_BORDER_WIDTH = 2
 const SIDE_LEN = boardCanvas.width / 8
 
 /** Enumeration of values that can occupy a space on the board. */
@@ -89,6 +89,8 @@ let turnPlayer = Player.LOCAL
 let selectedSpace: BoardIndex | null = null
 /** True if the player can make another move. Only the piece that moved can move again */
 let goAgain: boolean = false
+/** True if the game is started */
+let gameStarted: boolean = false
 
 /***************
  * FUNCTIONS
@@ -109,11 +111,11 @@ function isLocalPiece(space: BoardIndex) {
 }
 
 function isLocalMan(space: BoardIndex) {
-    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.LOCAL_MAN
+    return isSpaceInsideBoard(space) && get(space) === Space.LOCAL_MAN
 }
 
 function isLocalKing(space: BoardIndex) {
-    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.LOCAL_KING
+    return isSpaceInsideBoard(space) && get(space) === Space.LOCAL_KING
 }
 
 function isRemotePiece(space: BoardIndex) {
@@ -121,35 +123,50 @@ function isRemotePiece(space: BoardIndex) {
 }
 
 function isRemoteMan(space: BoardIndex) {
-    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.REMOTE_MAN
+    return isSpaceInsideBoard(space) && get(space) === Space.REMOTE_MAN
 }
 
 function isRemoteKing(space: BoardIndex) {
-    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.REMOTE_KING
+    return isSpaceInsideBoard(space) && get(space) === Space.REMOTE_KING
 }
 
 function isFree(space: BoardIndex) {
-    return isSpaceInsideBoard(space) && board[space.row][space.col] === Space.FREE
+    return isSpaceInsideBoard(space) && get(space) === Space.FREE
 }
 
 function isIndexEqual(i: BoardIndex, j: BoardIndex) {
     return i.row === j.row && i.col === j.col
 }
 
-function drawCircle(x: number, y: number, r: number, color: string) {
-    g.fillStyle = color
+function drawPiece(i: BoardIndex) {
+    if (isFree(i)) return  // Ignore free spaces
+    const [x, y] = [i.col*SIDE_LEN, i.row*SIDE_LEN]
+    const space = get(i)
+    const r = SIDE_LEN/2 - 4
     g.beginPath()
-    g.arc(x + r, y + r, r, 0, Math.PI * 2, false)
-    g.closePath()
+    g.strokeStyle = 'black'
+    switch (space) {
+        case Space.LOCAL_MAN:
+            g.fillStyle = LOCAL_MAN_COLOR
+            break
+        case Space.LOCAL_KING:
+            g.fillStyle = LOCAL_KING_COLOR
+            break
+        case Space.REMOTE_MAN:
+            g.fillStyle = REMOTE_MAN_COLOR
+            break
+        case Space.REMOTE_KING:
+            g.fillStyle = REMOTE_KING_COLOR
+            break
+    }
+    g.ellipse(x+SIDE_LEN/2, y+SIDE_LEN/2, r, r, 0, 0, 2*Math.PI)
     g.fill()
+    g.stroke()
 }
 
-function highlightSpace(space: BoardIndex, color: string) {
+function highlightSpace(i: BoardIndex, color: string) {
     g.strokeStyle = color
-    g.beginPath()
-    g.rect(space.col * SIDE_LEN, space.row * SIDE_LEN, SIDE_LEN, SIDE_LEN)
-    g.lineWidth = SELECTION_BORDER_WIDTH
-    g.stroke()
+    g.strokeRect(i.col*SIDE_LEN, i.row*SIDE_LEN, SIDE_LEN, SIDE_LEN)
 }
 
 function getClickedSpace(e: MouseEvent) {
@@ -159,109 +176,6 @@ function getClickedSpace(e: MouseEvent) {
     const i: BoardIndex = { row: Math.floor(y/SIDE_LEN), col: Math.floor(x/SIDE_LEN) }
     console.log('Clicked board space', i)
     return i
-}
-
-boardCanvas.addEventListener('click', event => {
-    const clickedSpace = getClickedSpace(event)
-    if (goAgain) {
-        if (validMoves) {
-            const move = anyMatch(validMoves, e => isIndexEqual(e.dest, clickedSpace))
-            if (move) {
-                makeMove(move)
-            }
-        }
-    } else if (isFree(clickedSpace) && selectedSpace) {
-        if (validMoves) {
-            const move = anyMatch(validMoves, e => isIndexEqual(e.dest, clickedSpace))
-            if (move) {
-                makeMove(move)
-            } else {
-                selectedSpace = null
-                validMoves = null
-            }
-        } else {
-            selectedSpace = null
-            validMoves = null
-        }
-    } else {
-        if (anyMatch(allValidMoves(turnPlayer), m => isIndexEqual(m.src, clickedSpace))) {
-            selectedSpace = clickedSpace
-            validMoves = getValidMoves(selectedSpace)
-        } else {
-            selectedSpace = null
-            validMoves = null
-        }
-    }
-    const winner = checkGameOver()
-    drawBoard()
-    if (winner) {
-        const color = winner === Player.LOCAL ? LOCAL_MAN_COLOR : REMOTE_MAN_COLOR
-        alert(`${color} has won!`)
-    }
-})
-
-export function drawBoard() {
-    for (let i = 0; i < board.length; i++) {
-        for (let j = 0; j < board[i].length; j++) {
-            const currentSpace = { row: i, col: j }
-            g.fillStyle = (i + j) % 2 ? DARK_SPACE_COLOR : LIGHT_SPACE_COLOR
-            const x = j * SIDE_LEN
-            const y = i * SIDE_LEN
-
-            g.fillRect(x, y, SIDE_LEN, SIDE_LEN)
-            if (isRemoteMan(currentSpace)) {
-                drawCircle(x, y, SIDE_LEN/2, REMOTE_MAN_COLOR)
-            } else if (isRemoteKing(currentSpace)) {
-                drawCircle(x, y, SIDE_LEN/2, REMOTE_KING_COLOR)
-            } else if (isLocalMan(currentSpace)) {
-                drawCircle(x, y, SIDE_LEN/2, LOCAL_MAN_COLOR)
-            } else if (isLocalKing(currentSpace)) {
-                drawCircle(x, y, SIDE_LEN/2, LOCAL_KING_COLOR)
-            }
-        }
-    }
-
-    allValidMoves(turnPlayer).forEach(m => {
-        highlightSpace(m.src, PIECE_SELECTION_BORDER_COLOR)
-    })
-
-    if (selectedSpace) {
-        highlightSpace(selectedSpace, PIECE_SELECTION_BORDER_COLOR)
-        validMoves?.forEach(m => {
-            highlightSpace(m.dest, FREE_SPACE_SELECTION_BORDER_COLOR)
-        })
-    }
-}
-
-function makeMove(move: Move) {
-    if (move.jumped) {
-        set(move.jumped, Space.FREE)
-        set(move.dest, get(move.src))
-        set(move.src, Space.FREE)
-        if (tryPromoteToKing(move.dest)) {
-            swapTurns()
-            return
-        }
-        selectedSpace = move.dest
-        validMoves = getValidMoves(selectedSpace)
-        if (anyMatch(validMoves, m => !!m.jumped)) {
-            goAgain = true
-        } else {
-            swapTurns()
-        }
-    } else {
-        set(move.dest, get(move.src))
-        set(move.src, Space.FREE)
-        tryPromoteToKing(move.dest)
-        swapTurns()
-    }
-}
-
-function swapTurns() {
-    turnPlayer = (turnPlayer === Player.LOCAL ? Player.REMOTE : Player.LOCAL)
-    selectedSpace = null
-    validMoves = null
-    goAgain = false
 }
 
 function tryPromoteToKing(i: BoardIndex) {
@@ -432,4 +346,113 @@ export function allValidMoves(p: Player) {
     } else {
         return allNonJumpMoves
     }
+}
+
+boardCanvas.addEventListener('click', event => {
+    if (!gameStarted) return
+    const clickedSpace = getClickedSpace(event)
+    if (goAgain) {
+        if (validMoves) {
+            const move = anyMatch(validMoves, e => isIndexEqual(e.dest, clickedSpace))
+            if (move) {
+                goAgain = !makeMove(move)
+                sendMove(move)
+                if (!goAgain) {
+                    sendEndTurn()
+                    swapTurns()
+                }
+            }
+        }
+    } else if (isFree(clickedSpace) && selectedSpace) {
+        if (validMoves) {
+            const move = anyMatch(validMoves, e => isIndexEqual(e.dest, clickedSpace))
+            if (move) {
+                goAgain = !makeMove(move)
+                sendMove(move)
+                if (!goAgain) {
+                    sendEndTurn()
+                    swapTurns()
+                }
+            } else {
+                selectedSpace = null
+                validMoves = null
+            }
+        } else {
+            selectedSpace = null
+            validMoves = null
+        }
+    } else {
+        if (anyMatch(allValidMoves(turnPlayer), m => isIndexEqual(m.src, clickedSpace))) {
+            selectedSpace = clickedSpace
+            validMoves = getValidMoves(selectedSpace)
+        } else {
+            selectedSpace = null
+            validMoves = null
+        }
+    }
+    const winner = checkGameOver()
+    drawBoard()
+    if (winner) {
+        const color = winner === Player.LOCAL ? LOCAL_MAN_COLOR : REMOTE_MAN_COLOR
+        alert(`${color} has won!`)
+    }
+})
+
+export function drawBoard() {
+    // g.clearRect(0, 0, boardCanvas.width, boardCanvas.height)
+    for (let i = 0; i < board.length; i++) {
+        for (let j = 0; j < board[i].length; j++) {
+            const currentSpace = { row: i, col: j }
+            const x = j * SIDE_LEN
+            const y = i * SIDE_LEN
+            g.fillStyle = (i + j) % 2 ? DARK_SPACE_COLOR : LIGHT_SPACE_COLOR
+            g.fillRect(x, y, SIDE_LEN, SIDE_LEN)
+            drawPiece(currentSpace)
+        }
+    }
+
+    if (turnPlayer === Player.LOCAL) {
+        allValidMoves(turnPlayer).forEach(m => {
+            highlightSpace(m.src, PIECE_SELECTION_BORDER_COLOR)
+        })
+
+        if (selectedSpace) {
+            highlightSpace(selectedSpace, PIECE_SELECTION_BORDER_COLOR)
+            validMoves?.forEach(m => {
+                highlightSpace(m.dest, FREE_SPACE_SELECTION_BORDER_COLOR)
+            })
+        }
+    }
+}
+
+export function startGame(startingPlayer: Player) {
+    turnPlayer = startingPlayer
+    gameStarted = true
+}
+
+/** Make a move. Return true if the turn should end. */
+export function makeMove(move: Move): boolean {
+    if (move.jumped) {
+        set(move.jumped, Space.FREE)
+        set(move.dest, get(move.src))
+        set(move.src, Space.FREE)
+        if (tryPromoteToKing(move.dest)) {
+            return true
+        }
+        selectedSpace = move.dest
+        validMoves = getValidMoves(selectedSpace)
+        return !anyMatch(validMoves, m => !!m.jumped)
+    } else {
+        set(move.dest, get(move.src))
+        set(move.src, Space.FREE)
+        tryPromoteToKing(move.dest)
+        return true
+    }
+}
+
+export function swapTurns() {
+    turnPlayer = (turnPlayer === Player.LOCAL ? Player.REMOTE : Player.LOCAL)
+    selectedSpace = null
+    validMoves = null
+    goAgain = false
 }

@@ -5,48 +5,120 @@
  */
 
 import Peer from 'peerjs'
+import { Player, Move, startGame, makeMove, drawBoard, swapTurns } from './gameboard'
 
-const idPrefix = 'se181-checkers'
-
-let localPeer: Peer
-
-function generateGameCode() {
-    // TODO Generate sufficiently random room code
-    return '0001'
+enum MessageType {
+    START_GAME,
+    MOVE,
+    END_TURN
 }
 
-function setupEventHandlers() {
-    localPeer.on('error', err => {
+interface StartGamePayload {
+    type: MessageType.START_GAME
+    turnPlayer: Player
+}
+
+interface MovePayload {
+    type: MessageType.MOVE
+    move: Move
+}
+
+interface EndTurnPayload {
+    type: MessageType.END_TURN
+}
+
+type PDU = MovePayload | EndTurnPayload | StartGamePayload
+
+const localPeer = new Peer({debug: 1})
+let conn: Peer.DataConnection
+
+/** Get the broker ID for a Peer connection. */
+async function getBrokerId(peer: Peer) {
+    const id = new Promise<string>((resolve, reject) => {
+        if (peer.id) {
+            resolve(peer.id)
+        } else {
+            peer.on('open', id => {
+                resolve(id)
+            })
+            peer.on('error', err => {
+                reject(err)
+            })
+        }
+    })
+    return await id
+}
+
+function addDataConnectionHandlers() {
+    conn.on('error', err => {
         console.error(err)
+        conn.close()
+    })
+    conn.on('data', (data: PDU) => {
+        console.log('rx', data)
+        switch (data.type) {
+            case MessageType.START_GAME:
+                startGame(data.turnPlayer)
+                drawBoard()
+                break
+            case MessageType.MOVE:
+                makeMove(data.move)
+                drawBoard()
+                break
+            case MessageType.END_TURN:
+                swapTurns()
+                drawBoard()
+                break
+        }
     })
 }
 
-export function hostGame() {
-    const gameCode = generateGameCode()
-    const brokerId = `${idPrefix}_${gameCode}`
-    localPeer = new Peer(brokerId)
-    setupEventHandlers()
-    localPeer.on('connection', conn => {
-        console.log('Got a connection')
-        conn.on('data', data => {
-            console.log(data)
-        })
-        conn.on('error', err => {
-            console.error(err)
+export async function hostGame() {
+    const id = await getBrokerId(localPeer)
+    localPeer.on('connection', c => {
+        conn = c
+        addDataConnectionHandlers()
+        conn.on('open', () => {
+            const msg = {type: MessageType.START_GAME, turnPlayer: Player.REMOTE}
+            console.log('tx', msg)
+            conn.send(msg)
+            startGame(Player.LOCAL)
+            localPeer.disconnect()
         })
     })
+    alert(`Game code: ${id}`)
 }
 
 export function joinGame(gameCode: string | null) {
     if (!gameCode) throw new Error('Game code is null')
-    localPeer = new Peer()
-    setupEventHandlers()
-    const brokerId = `${idPrefix}_${gameCode}`
-    const dataConn = localPeer.connect(brokerId)
-    dataConn.on('error', err => {
-        console.error(err)
+    conn = localPeer.connect(gameCode)
+    conn.on('open', () => {
+        localPeer.disconnect()
     })
-    dataConn.on('open', () => {
-        dataConn.send('Hello')
-    })
+    addDataConnectionHandlers()
+}
+
+export function sendEndTurn() {
+    const msg = { type: MessageType.END_TURN }
+    console.log('tx', msg)
+    conn.send(msg)
+}
+
+export function sendMove(move: Move) {
+    // Transform move before sending
+    if (move.jumped) {
+        move = {
+            src: { row: 7-move.src.row, col: 7-move.src.col },
+            dest: { row: 7-move.dest.row, col: 7-move.dest.col },
+            jumped: { row: 7-move.jumped.row, col: 7-move.jumped.col }
+        }
+    } else {
+        move = {
+            src: { row: 7-move.src.row, col: 7-move.src.col },
+            dest: { row: 7-move.dest.row, col: 7-move.dest.col },
+        }
+    }
+    const msg = { type: MessageType.MOVE, move }
+    console.log('tx', msg)
+    conn.send(msg)
 }
