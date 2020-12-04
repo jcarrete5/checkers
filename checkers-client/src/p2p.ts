@@ -5,29 +5,43 @@
  */
 
 import Peer from 'peerjs'
+import { Player, Move, startGame, makeMove, drawBoard, swapTurns } from './gameboard'
 
 enum MessageType {
+    START_GAME,
     MOVE,
     END_TURN
 }
 
-interface PDU {
-    type: MessageType
-    payload: any
+interface StartGamePayload {
+    type: MessageType.START_GAME
+    turnPlayer: Player
 }
 
-const localPeer = new Peer()
+interface MovePayload {
+    type: MessageType.MOVE
+    move: Move
+}
 
-/** Get the broker ID for the local Peer connection. */
-async function getBrokerId() {
+interface EndTurnPayload {
+    type: MessageType.END_TURN
+}
+
+type PDU = MovePayload | EndTurnPayload | StartGamePayload
+
+const localPeer = new Peer({debug: 1})
+let conn: Peer.DataConnection
+
+/** Get the broker ID for a Peer connection. */
+async function getBrokerId(peer: Peer) {
     const id = new Promise<string>((resolve, reject) => {
-        if (localPeer.id) {
-            resolve(localPeer.id)
+        if (peer.id) {
+            resolve(peer.id)
         } else {
-            localPeer.on('open', id => {
+            peer.on('open', id => {
                 resolve(id)
             })
-            localPeer.on('error', err => {
+            peer.on('error', err => {
                 reject(err)
             })
         }
@@ -35,26 +49,76 @@ async function getBrokerId() {
     return await id
 }
 
-function addDataConnectionHandlers(conn: Peer.DataConnection) {
+function addDataConnectionHandlers() {
     conn.on('error', err => {
         console.error(err)
         conn.close()
     })
     conn.on('data', (data: PDU) => {
-        // TODO process PDU i.e. update game state
+        console.log('rx', data)
+        switch (data.type) {
+            case MessageType.START_GAME:
+                startGame(data.turnPlayer)
+                drawBoard()
+                break
+            case MessageType.MOVE:
+                makeMove(data.move)
+                drawBoard()
+                break
+            case MessageType.END_TURN:
+                swapTurns()
+                drawBoard()
+                break
+        }
     })
 }
 
 export async function hostGame() {
-    const id = await getBrokerId()
-    alert(`Game code: ${id}`)
-    localPeer.on('connection', conn => {
-        addDataConnectionHandlers(conn)
+    const id = await getBrokerId(localPeer)
+    localPeer.on('connection', c => {
+        conn = c
+        addDataConnectionHandlers()
+        conn.on('open', () => {
+            const msg = {type: MessageType.START_GAME, turnPlayer: Player.REMOTE}
+            console.log('tx', msg)
+            conn.send(msg)
+            startGame(Player.LOCAL)
+            localPeer.disconnect()
+        })
     })
+    alert(`Game code: ${id}`)
 }
 
 export function joinGame(gameCode: string | null) {
     if (!gameCode) throw new Error('Game code is null')
-    const conn = localPeer.connect(gameCode)
-    addDataConnectionHandlers(conn)
+    conn = localPeer.connect(gameCode)
+    conn.on('open', () => {
+        localPeer.disconnect()
+    })
+    addDataConnectionHandlers()
+}
+
+export function sendEndTurn() {
+    const msg = { type: MessageType.END_TURN }
+    console.log('tx', msg)
+    conn.send(msg)
+}
+
+export function sendMove(move: Move) {
+    // Transform move before sending
+    if (move.jumped) {
+        move = {
+            src: { row: 7-move.src.row, col: 7-move.src.col },
+            dest: { row: 7-move.dest.row, col: 7-move.dest.col },
+            jumped: { row: 7-move.jumped.row, col: 7-move.jumped.col }
+        }
+    } else {
+        move = {
+            src: { row: 7-move.src.row, col: 7-move.src.col },
+            dest: { row: 7-move.dest.row, col: 7-move.dest.col },
+        }
+    }
+    const msg = { type: MessageType.MOVE, move }
+    console.log('tx', msg)
+    conn.send(msg)
 }
