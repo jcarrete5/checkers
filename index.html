@@ -1,12 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checkers v1.0</title>
-    <script src="bundle.js" async defer></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkers v1.0</title>
+  <link rel="stylesheet" href="index.css">
+  <script src="bundle.js" async defer></script>
 </head>
+
 <body>
+  <div class="page-wrapper">
+    <div class="column">
+      <button id="btn-resign" class="column-item" disabled>Resign</button>
+      <button id="btn-draw" class="column-item" disabled>Offer Draw</button>
+    </div>
     <canvas id="board-canvas" width="600" height="600"></canvas>
+    <div class="column">
+      <button id="btn-create-game" class="column-item">Create Game</button>
+      <button id="btn-join-game" class="column-item">Join Game</button>
+    </div>
+  </div>
 </body>
+
 </html>
